@@ -1,0 +1,27 @@
+# .htaccess untuk folder public
+# Simpan di: xampp/htdocs/simaku/public/.htaccess
+
+<IfModule mod_rewrite.c>
+    # Turn on URL rewriting
+    RewriteEngine On
+
+    # Allow any files or directories that exist to be displayed directly
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Rewrite all other URLs to index.php/URL
+    RewriteRule ^(.*)$ index.php/$1 [L]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+    # Without mod_rewrite, route 404 errors to index.php
+    ErrorDocument 404 index.php
+</IfModule>
+
+# Disable directory browsing
+Options -Indexes
+
+# Deny access to hidden files
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

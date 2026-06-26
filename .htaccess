@@ -1,0 +1,21 @@
+# Root .htaccess untuk redirect ke public folder
+# Letakkan file ini di: xampp/htdocs/simaku/.htaccess
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Redirect semua request ke folder public/
+    # KECUALI file/folder yang sudah ada
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Disable directory listing
+Options -Indexes
+
+# Prevent access to sensitive files
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
