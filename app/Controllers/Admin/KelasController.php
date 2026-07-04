@@ -34,7 +34,10 @@ class KelasController extends BaseController
         
         $data = [
             'title' => 'Kelas',
-            'kelas' => $kelas
+            'kelas' => $kelas,
+            // Dipakai dropdown "Tahun Ajaran" di modal tambah/edit
+            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
+            'errors' => session()->getFlashdata('errors') ?? []
         ];
         
         return view('admin/kelas/index', $data);
@@ -42,16 +45,11 @@ class KelasController extends BaseController
     
     /**
      * Form tambah/edit kelas
+     * UPDATE: form sudah jadi modal di halaman index, URL lama dialihkan ke sana.
      */
     public function create()
     {
-        $data = [
-            'title' => 'Tambah Kelas',
-            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
-            'errors' => session()->getFlashdata('errors') ?? []
-        ];
-        
-        return view('admin/kelas/form', $data);
+        return redirect()->to(base_url('admin/kelas#tambah'));
     }
     
     /**
@@ -93,6 +91,7 @@ class KelasController extends BaseController
     
     /**
      * Form edit kelas
+     * UPDATE: form sudah jadi modal di halaman index, URL lama dialihkan ke sana.
      */
     public function edit($id)
     {
@@ -102,14 +101,7 @@ class KelasController extends BaseController
             return redirect()->to(base_url('admin/kelas'))->with('error', 'Kelas tidak ditemukan');
         }
         
-        $data = [
-            'title' => 'Edit Kelas',
-            'kelas' => $kelas,
-            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
-            'errors' => session()->getFlashdata('errors') ?? []
-        ];
-        
-        return view('admin/kelas/form', $data);
+        return redirect()->to(base_url('admin/kelas#edit-' . $id));
     }
     
     /**

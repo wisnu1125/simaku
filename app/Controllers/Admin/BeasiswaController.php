@@ -31,44 +31,57 @@ class BeasiswaController extends BaseController
     
     /**
      * List beasiswa
+     * UPDATE: pagination server via AJAX (261+ baris & terus bertambah), form Tambah/Edit
+     * jadi modal di halaman ini juga.
      */
     public function index()
     {
         $filterTahunAjaran = $this->request->getGet('filter_tahun_ajaran');
         $keyword = $this->request->getGet('keyword');
         
-        $builder = $this->beasiswaModel
-                        ->select('beasiswa.*, 
-                                 siswa.nis, 
-                                 siswa.nama_lengkap as nama_siswa,
-                                 jenis_tagihan.nama_tagihan,
-                                 tahun_ajaran.nama_tahun_ajaran')
-                        ->join('siswa', 'siswa.id_siswa = beasiswa.id_siswa', 'left')
-                        ->join('jenis_tagihan', 'jenis_tagihan.id_jenis_tagihan = beasiswa.id_jenis_tagihan', 'left')
-                        ->join('tahun_ajaran', 'tahun_ajaran.id_tahun_ajaran = beasiswa.id_tahun_ajaran', 'left');
+        $applyFilters = function ($model) use ($filterTahunAjaran, $keyword) {
+            if ($filterTahunAjaran) $model->where('beasiswa.id_tahun_ajaran', $filterTahunAjaran);
+            if ($keyword) {
+                $model->groupStart()
+                      ->like('siswa.nis', $keyword)
+                      ->orLike('siswa.nama_lengkap', $keyword)
+                      ->orLike('beasiswa.nama_beasiswa', $keyword)
+                      ->groupEnd();
+            }
+            return $model;
+        };
         
-        if ($filterTahunAjaran) {
-            $builder->where('beasiswa.id_tahun_ajaran', $filterTahunAjaran);
+        if ($this->request->isAJAX()) {
+            $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
+            $perPage = min(50, max(5, (int) ($this->request->getGet('per_page') ?? 15)));
+            
+            $listModel = new BeasiswaModel();
+            $listModel->select('beasiswa.*, siswa.nis, siswa.nama_lengkap as nama_siswa, jenis_tagihan.nama_tagihan, tahun_ajaran.nama_tahun_ajaran')
+                      ->join('siswa', 'siswa.id_siswa = beasiswa.id_siswa', 'left')
+                      ->join('jenis_tagihan', 'jenis_tagihan.id_jenis_tagihan = beasiswa.id_jenis_tagihan', 'left')
+                      ->join('tahun_ajaran', 'tahun_ajaran.id_tahun_ajaran = beasiswa.id_tahun_ajaran', 'left');
+            $applyFilters($listModel);
+            
+            $total = $listModel->countAllResults(false);
+            $rows  = $listModel->orderBy('tahun_ajaran.nama_tahun_ajaran', 'DESC')
+                               ->orderBy('siswa.nama_lengkap', 'ASC')
+                               ->limit($perPage, ($page - 1) * $perPage)
+                               ->findAll();
+            
+            return $this->response->setJSON([
+                'rows' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage,
+                'total_pages' => (int) max(1, ceil($total / $perPage)),
+            ]);
         }
-        
-        if ($keyword) {
-            $builder->groupStart()
-                    ->like('siswa.nis', $keyword)
-                    ->orLike('siswa.nama_lengkap', $keyword)
-                    ->orLike('beasiswa.nama_beasiswa', $keyword)
-                    ->groupEnd();
-        }
-        
-        $beasiswa = $builder->orderBy('tahun_ajaran.nama_tahun_ajaran', 'DESC')
-                           ->orderBy('siswa.nama_lengkap', 'ASC')
-                           ->findAll();
         
         $data = [
             'title' => 'Beasiswa',
-            'beasiswa' => $beasiswa,
+            'jenis_tagihan' => $this->jenisTagihanModel->getActiveJenisTagihan(),
+            'jenis_tagihan_grouped' => $this->jenisTagihanModel->getGroupedJenisTagihan(),
             'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
             'filter_tahun_ajaran' => $filterTahunAjaran,
-            'keyword' => $keyword
+            'keyword' => $keyword,
+            'errors' => session()->getFlashdata('errors') ?? []
         ];
         
         return view('admin/beasiswa/index', $data);
@@ -76,18 +89,11 @@ class BeasiswaController extends BaseController
     
     /**
      * Form tambah beasiswa
+     * UPDATE: form sudah jadi modal di halaman index, URL lama dialihkan ke sana.
      */
     public function create()
     {
-        $data = [
-            'title' => 'Tambah Beasiswa',
-            'jenis_tagihan' => $this->jenisTagihanModel->getActiveJenisTagihan(),
-            'jenis_tagihan_grouped' => $this->jenisTagihanModel->getGroupedJenisTagihan(),
-            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
-            'errors' => session()->getFlashdata('errors') ?? []
-        ];
-        
-        return view('admin/beasiswa/form', $data);
+        return redirect()->to(base_url('admin/beasiswa#tambah'));
     }
     
     /**
@@ -282,6 +288,10 @@ class BeasiswaController extends BaseController
     /**
      * Form edit beasiswa
      */
+    /**
+     * Form edit beasiswa
+     * UPDATE: form sudah jadi modal di halaman index, URL lama dialihkan ke sana.
+     */
     public function edit($id)
     {
         $beasiswa = $this->beasiswaModel->find($id);
@@ -290,16 +300,7 @@ class BeasiswaController extends BaseController
             return redirect()->to(base_url('admin/beasiswa'))->with('error', 'Beasiswa tidak ditemukan');
         }
         
-        $data = [
-            'title' => 'Edit Beasiswa',
-            'beasiswa' => $beasiswa,
-            'jenis_tagihan' => $this->jenisTagihanModel->getActiveJenisTagihan(),
-            'jenis_tagihan_grouped' => $this->jenisTagihanModel->getGroupedJenisTagihan(),
-            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
-            'errors' => session()->getFlashdata('errors') ?? []
-        ];
-        
-        return view('admin/beasiswa/form', $data);
+        return redirect()->to(base_url('admin/beasiswa#edit-' . $id));
     }
     
     /**

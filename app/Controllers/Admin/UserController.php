@@ -26,7 +26,8 @@ class UserController extends BaseController
         
         $data = [
             'title' => 'User Management',
-            'users' => $users
+            'users' => $users,
+            'errors' => session()->getFlashdata('errors') ?? []
         ];
         
         return view('admin/users/index', $data);
@@ -34,15 +35,11 @@ class UserController extends BaseController
     
     /**
      * Form tambah user
+     * UPDATE: form sudah jadi modal di halaman index, URL lama dialihkan ke sana.
      */
     public function create()
     {
-        $data = [
-            'title' => 'Tambah User',
-            'errors' => session()->getFlashdata('errors') ?? []
-        ];
-        
-        return view('admin/users/form', $data);
+        return redirect()->to(base_url('admin/users#tambah'));
     }
     
     /**
@@ -56,7 +53,11 @@ class UserController extends BaseController
             'password' => 'required|min_length[6]',
             'password_confirm' => 'required|matches[password]',
             'nama_lengkap' => 'required|min_length[3]',
-            'role' => 'required|in_list[super_admin,admin]'
+            // FIX: nilai 'admin' tidak pernah ada di kolom enum `role` pada database
+            // (yang valid hanya 'super_admin' dan 'tu_bendahara'). Sebelumnya validasi di sini
+            // meloloskan 'admin', lalu proses insert() di bawah gagal secara diam-diam karena
+            // validasi bawaan UserModel menolaknya duluan sebelum menyentuh DB.
+            'role' => 'required|in_list[super_admin,tu_bendahara]'
         ];
         
         if (!$this->validate($rules)) {
@@ -72,7 +73,16 @@ class UserController extends BaseController
             'status' => 'aktif'
         ];
         
-        $this->userModel->insert($data);
+        // FIX: cek hasil insert(). Sebelumnya hasil ini diabaikan, jadi kalau gagal
+        // (misalnya validasi model menolak), user tetap diarahkan ke pesan "berhasil"
+        // padahal tidak ada data yang tersimpan.
+        if (!$this->userModel->insert($data)) {
+            $modelErrors = $this->userModel->errors();
+            if ($modelErrors) {
+                return redirect()->back()->withInput()->with('errors', $modelErrors);
+            }
+            return redirect()->back()->withInput()->with('error', 'Gagal menyimpan user, silakan coba lagi.');
+        }
         
         // Audit log
         $this->auditLogModel->insert([
@@ -90,6 +100,7 @@ class UserController extends BaseController
     
     /**
      * Form edit user
+     * UPDATE: form sudah jadi modal di halaman index, URL lama dialihkan ke sana.
      */
     public function edit($id)
     {
@@ -104,13 +115,7 @@ class UserController extends BaseController
             return redirect()->to(base_url('admin/users'))->with('error', 'Tidak memiliki akses');
         }
         
-        $data = [
-            'title' => 'Edit User',
-            'user' => $user,
-            'errors' => session()->getFlashdata('errors') ?? []
-        ];
-        
-        return view('admin/users/form', $data);
+        return redirect()->to(base_url('admin/users#edit-' . $id));
     }
     
     /**
@@ -133,7 +138,8 @@ class UserController extends BaseController
             'username' => 'required|min_length[4]',
             'email' => 'required|valid_email',
             'nama_lengkap' => 'required|min_length[3]',
-            'role' => 'required|in_list[super_admin,admin]',
+            // FIX: samakan dengan enum database ('super_admin', 'tu_bendahara'), lihat catatan di store()
+            'role' => 'required|in_list[super_admin,tu_bendahara]',
             'status' => 'required|in_list[aktif,nonaktif]'
         ];
         
@@ -171,7 +177,14 @@ class UserController extends BaseController
             $data['password'] = password_hash($password, PASSWORD_DEFAULT);
         }
         
-        $this->userModel->update($id, $data);
+        // FIX: cek hasil update(), lihat catatan yang sama di store()
+        if (!$this->userModel->update($id, $data)) {
+            $modelErrors = $this->userModel->errors();
+            if ($modelErrors) {
+                return redirect()->back()->withInput()->with('errors', $modelErrors);
+            }
+            return redirect()->back()->withInput()->with('error', 'Gagal mengupdate user, silakan coba lagi.');
+        }
         
         // Audit log
         $this->auditLogModel->insert([

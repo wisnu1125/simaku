@@ -30,100 +30,94 @@ class SkemaTagihanController extends BaseController
     }
     
     /**
-     * List skema tagihan - FIXED: Mengirim semua data agar DataTables JS bekerja sempurna
+     * List skema tagihan
+     * UPDATE: pagination server via AJAX (289+ baris, terus bertambah tiap kali generate
+     * dijalankan). Filter Grup baru ditambahkan supaya tetap gampang ditelusuri walau
+     * tampilannya sekarang tabel datar (bukan dikelompokkan di halaman seperti sebelumnya --
+     * pengelompokan tidak cocok digabung dengan pagination per halaman).
      */
     public function index()
     {
-        $filter = $this->request->getGet('filter_tahun_ajaran');
+        $filterTahunAjaran = $this->request->getGet('filter_tahun_ajaran');
+        $filterGrup = $this->request->getGet('filter_grup');
+        $keyword = $this->request->getGet('keyword');
         
-        // Mulai Builder
-        $builder = $this->skemaTagihanModel
-                        ->select('skema_tagihan.*, 
-                                  jenis_tagihan.nama_tagihan, 
-                                  jenis_tagihan.tipe_tagihan,
-                                  jenis_tagihan.grup_tagihan,
-                                  tahun_ajaran.nama_tahun_ajaran,
-                                  tahun_ajaran.status as status_tahun_ajaran,
-                                  kelas.nama_kelas,
-                                  siswa.nama_lengkap as nama_siswa,
-                                  siswa.nis')
-                        ->join('jenis_tagihan', 'jenis_tagihan.id_jenis_tagihan = skema_tagihan.id_jenis_tagihan', 'left')
-                        ->join('tahun_ajaran', 'tahun_ajaran.id_tahun_ajaran = skema_tagihan.id_tahun_ajaran', 'left')
-                        ->join('kelas', 'kelas.id_kelas = skema_tagihan.id_kelas', 'left')
-                        ->join('siswa', 'siswa.id_siswa = skema_tagihan.id_siswa', 'left');
-        
-        // Filter Tahun Ajaran (Wajib ada biar data tidak terlalu berat)
-        if ($filter) {
-            $builder->where('skema_tagihan.id_tahun_ajaran', $filter);
-        }
-        
-        // Sorting Default
-        $builder->orderBy('jenis_tagihan.grup_tagihan', 'ASC')
-                ->orderBy('jenis_tagihan.nama_tagihan', 'ASC');
-        
-        // PERBAIKAN UTAMA:
-        // Ganti paginate() dengan findAll() agar DataTables JS menerima semua data
-        // dan bisa membuat dropdown filter Group dengan lengkap.
-        $skema = $builder->findAll();
-        
-        // Grouping Data (Logic PHP tetap dipertahankan)
-        $groupedSkema = [];
-        foreach ($skema as $st) {
-            // Pastikan nama grup konsisten (trim spasi)
-            $grup = trim($st['grup_tagihan'] ?? '');
-            if ($grup === '') {
-                $grup = 'LAINNYA';
+        $applyFilters = function ($model) use ($filterTahunAjaran, $filterGrup, $keyword) {
+            if ($filterTahunAjaran) $model->where('skema_tagihan.id_tahun_ajaran', $filterTahunAjaran);
+            if ($filterGrup) $model->where('jenis_tagihan.grup_tagihan', $filterGrup);
+            if ($keyword) {
+                $model->groupStart()
+                      ->like('siswa.nama_lengkap', $keyword)
+                      ->orLike('kelas.nama_kelas', $keyword)
+                      ->orLike('jenis_tagihan.nama_tagihan', $keyword)
+                      ->groupEnd();
             }
+            return $model;
+        };
+        
+        if ($this->request->isAJAX()) {
+            $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
+            $perPage = min(50, max(5, (int) ($this->request->getGet('per_page') ?? 20)));
             
-            if (!isset($groupedSkema[$grup])) {
-                $groupedSkema[$grup] = [];
-            }
-            $groupedSkema[$grup][] = $st;
+            $listModel = new SkemaTagihanModel();
+            $listModel->select('skema_tagihan.*, jenis_tagihan.nama_tagihan, jenis_tagihan.tipe_tagihan, jenis_tagihan.grup_tagihan,
+                                 tahun_ajaran.nama_tahun_ajaran, kelas.nama_kelas, siswa.nama_lengkap as nama_siswa, siswa.nis')
+                      ->join('jenis_tagihan', 'jenis_tagihan.id_jenis_tagihan = skema_tagihan.id_jenis_tagihan', 'left')
+                      ->join('tahun_ajaran', 'tahun_ajaran.id_tahun_ajaran = skema_tagihan.id_tahun_ajaran', 'left')
+                      ->join('kelas', 'kelas.id_kelas = skema_tagihan.id_kelas', 'left')
+                      ->join('siswa', 'siswa.id_siswa = skema_tagihan.id_siswa', 'left');
+            $applyFilters($listModel);
+            
+            $total = $listModel->countAllResults(false);
+            $rows  = $listModel->orderBy('jenis_tagihan.grup_tagihan', 'ASC')
+                               ->orderBy('jenis_tagihan.nama_tagihan', 'ASC')
+                               ->orderBy('skema_tagihan.bulan_tagihan', 'ASC')
+                               ->limit($perPage, ($page - 1) * $perPage)
+                               ->findAll();
+            
+            return $this->response->setJSON([
+                'rows' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage,
+                'total_pages' => (int) max(1, ceil($total / $perPage)),
+            ]);
         }
         
-        // Kirim data ke View
+        // Daftar grup unik (untuk dropdown filter) diambil dari jenis_tagihan, bukan skema_tagihan,
+        // supaya grup yang belum punya skema pun tetap muncul sebagai pilihan filter.
+        $grupList = $this->jenisTagihanModel->select('grup_tagihan')->distinct()->orderBy('grup_tagihan', 'ASC')->findAll();
+        
         $data = [
             'title' => 'Skema Tagihan',
-            'skema' => $skema,               // Data mentah (full)
-            'grouped_skema' => $groupedSkema,// Data terkelompok (full)
-            'pager' => null,                 // Pager dimatikan (dihandle JS DataTables)
+            'jenis_tagihan_grouped' => $this->jenisTagihanModel->getGroupedJenisTagihan(),
             'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
-            'filter_tahun_ajaran' => $filter
+            'kelas' => $this->kelasModel->getKelasWithTahunAjaran(),
+            'grup_list' => $grupList,
+            'filter_tahun_ajaran' => $filterTahunAjaran,
+            'filter_grup' => $filterGrup,
+            'errors' => session()->getFlashdata('errors') ?? []
         ];
         
         return view('admin/skema_tagihan/index', $data);
     }
     
     /**
-     * Form tambah skema tagihan
+     * Form tambah skema tagihan (checklist massal)
+     * UPDATE: form sudah jadi modal di halaman index, URL lama dialihkan ke sana.
      */
     public function create()
     {
-        $data = [
-            'title' => 'Tambah Skema Tagihan',
-            'jenis_tagihan' => $this->jenisTagihanModel->getActiveJenisTagihan(),
-            'jenis_tagihan_grouped' => $this->jenisTagihanModel->getGroupedJenisTagihan(),
-            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
-            'kelas' => $this->kelasModel->getKelasWithTahunAjaran(),
-            'errors' => session()->getFlashdata('errors') ?? []
-        ];
-        
-        return view('admin/skema_tagihan/form', $data);
+        return redirect()->to(base_url('admin/skema-tagihan#tambah'));
     }
     
     /**
      * Form generate bulk (checklist style)
+     * UPDATE: sebelumnya mengarah ke view 'form_bulk' yang filenya tidak pernah ada di
+     * proyek ini (akan 500 error kalau diakses) dan tidak ada satupun tautan ke sini di
+     * seluruh aplikasi. Sekarang diarahkan ke halaman index yang modalnya sudah mencakup
+     * fungsi checklist massal ini.
      */
     public function generateBulk()
     {
-        $data = [
-            'title' => 'Generate Skema Tagihan (Bulk)',
-            'jenis_tagihan_grouped' => $this->jenisTagihanModel->getGroupedJenisTagihan(),
-            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
-            'kelas' => $this->kelasModel->getKelasWithTahunAjaran()
-        ];
-        
-        return view('admin/skema_tagihan/form_bulk', $data);
+        return redirect()->to(base_url('admin/skema-tagihan#tambah'));
     }
     
     /**
@@ -420,6 +414,16 @@ class SkemaTagihanController extends BaseController
     /**
      * Form edit skema tagihan
      */
+    /**
+     * Form edit skema tagihan
+     * UPDATE PENTING: sebelumnya method ini me-render view yang sama dengan halaman
+     * "Generate Bulk" (form.php) -- padahal view itu TIDAK PERNAH memakai variabel $skema
+     * sama sekali, dan satu-satunya <form> di dalamnya selalu submit ke store-bulk (bukan
+     * update/$id). Akibatnya, mengklik "Edit" pada baris manapun selama ini menampilkan
+     * form checklist massal yang kosong, dan submit-nya tidak pernah benar-benar
+     * memperbarui baris yang dimaksud. Sekarang diarahkan ke modal edit yang baru,
+     * yang benar-benar terhubung ke update($id) di bawah.
+     */
     public function edit($id)
     {
         $skema = $this->skemaTagihanModel->find($id);
@@ -428,19 +432,7 @@ class SkemaTagihanController extends BaseController
             return redirect()->to(base_url('admin/skema-tagihan'))->with('error', 'Skema tagihan tidak ditemukan');
         }
         
-        $skema['tipe_skema'] = $skema['id_siswa'] ? 'siswa' : 'kelas';
-        
-        $data = [
-            'title' => 'Edit Skema Tagihan',
-            'skema' => $skema,
-            'jenis_tagihan' => $this->jenisTagihanModel->getActiveJenisTagihan(),
-            'jenis_tagihan_grouped' => $this->jenisTagihanModel->getGroupedJenisTagihan(),
-            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
-            'kelas' => $this->kelasModel->getKelasWithTahunAjaran(),
-            'errors' => session()->getFlashdata('errors') ?? []
-        ];
-        
-        return view('admin/skema_tagihan/form', $data);
+        return redirect()->to(base_url('admin/skema-tagihan#edit-' . $id));
     }
     
     /**

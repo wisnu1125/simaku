@@ -16,48 +16,55 @@ class AuditLogController extends BaseController
     
     /**
      * List audit log
+     * UPDATE: pagination sekarang lewat AJAX (fetch), bukan reload halaman penuh tiap
+     * ganti halaman/filter. Log ini tidak pernah berhenti bertambah, jadi tetap dibatasi
+     * per halaman di server seperti sebelumnya -- cuma cara mengambilnya yang berubah.
      */
     public function index()
     {
-        $perPage = 50;
         $tanggalMulai = $this->request->getGet('tanggal_mulai');
         $tanggalSelesai = $this->request->getGet('tanggal_selesai');
         $modul = $this->request->getGet('modul');
         $aksi = $this->request->getGet('aksi');
         $keyword = $this->request->getGet('keyword');
         
-        $builder = $this->auditLogModel
-                        ->select('audit_log.*, users.nama_lengkap, users.username')
-                        ->join('users', 'users.id_user = audit_log.id_user', 'left');
+        $applyFilters = function ($model) use ($tanggalMulai, $tanggalSelesai, $modul, $aksi, $keyword) {
+            if ($tanggalMulai) $model->where('DATE(audit_log.created_at) >=', $tanggalMulai);
+            if ($tanggalSelesai) $model->where('DATE(audit_log.created_at) <=', $tanggalSelesai);
+            if ($modul) $model->where('audit_log.modul', $modul);
+            if ($aksi) $model->where('audit_log.aksi', $aksi);
+            if ($keyword) {
+                $model->groupStart()
+                      ->like('users.nama_lengkap', $keyword)
+                      ->orLike('users.username', $keyword)
+                      ->orLike('audit_log.keterangan', $keyword)
+                      ->groupEnd();
+            }
+            return $model;
+        };
         
-        if ($tanggalMulai) {
-            $builder->where('DATE(audit_log.created_at) >=', $tanggalMulai);
+        if ($this->request->isAJAX()) {
+            $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
+            $perPage = min(100, max(10, (int) ($this->request->getGet('per_page') ?? 30)));
+            
+            $listModel = new AuditLogModel();
+            $listModel->select('audit_log.*, users.nama_lengkap, users.username')
+                      ->join('users', 'users.id_user = audit_log.id_user', 'left');
+            $applyFilters($listModel);
+            
+            $total = $listModel->countAllResults(false);
+            $rows  = $listModel->orderBy('audit_log.created_at', 'DESC')
+                               ->limit($perPage, ($page - 1) * $perPage)
+                               ->findAll();
+            
+            return $this->response->setJSON([
+                'rows' => $rows,
+                'total' => $total,
+                'page' => $page,
+                'per_page' => $perPage,
+                'total_pages' => (int) max(1, ceil($total / $perPage)),
+            ]);
         }
-        
-        if ($tanggalSelesai) {
-            $builder->where('DATE(audit_log.created_at) <=', $tanggalSelesai);
-        }
-        
-        if ($modul) {
-            $builder->where('audit_log.modul', $modul);
-        }
-        
-        if ($aksi) {
-            $builder->where('audit_log.aksi', $aksi);
-        }
-        
-        if ($keyword) {
-            $builder->groupStart()
-                    ->like('users.nama_lengkap', $keyword)
-                    ->orLike('users.username', $keyword)
-                    ->orLike('audit_log.keterangan', $keyword)
-                    ->groupEnd();
-        }
-        
-        $logs = $builder->orderBy('audit_log.created_at', 'DESC')
-                       ->paginate($perPage);
-        
-        $pager = $this->auditLogModel->pager;
         
         // Get available modules
         $modulesResult = $this->auditLogModel->select('modul')
@@ -73,8 +80,6 @@ class AuditLogController extends BaseController
         
         $data = [
             'title' => 'Audit Log',
-            'logs' => $logs,
-            'pager' => $pager,
             'modules' => $modulesResult,
             'actions' => $actionsResult,
             'tanggal_mulai' => $tanggalMulai,
@@ -89,6 +94,8 @@ class AuditLogController extends BaseController
     
     /**
      * Detail audit log
+     * UPDATE: mendukung AJAX JSON (dipakai drawer di halaman index), tetap redirect
+     * biasa kalau diakses langsung lewat URL (bookmark lama).
      */
     public function detail($id)
     {
@@ -99,14 +106,16 @@ class AuditLogController extends BaseController
                     ->first();
         
         if (!$log) {
+            if ($this->request->isAJAX()) {
+                return $this->response->setStatusCode(404)->setJSON(['error' => 'Log tidak ditemukan']);
+            }
             return redirect()->to(base_url('admin/audit-log'))->with('error', 'Log tidak ditemukan');
         }
         
-        $data = [
-            'title' => 'Detail Audit Log',
-            'log' => $log
-        ];
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON(['log' => $log]);
+        }
         
-        return view('admin/audit_log/detail', $data);
+        return redirect()->to(base_url('admin/audit-log#detail-' . $id));
     }
 }

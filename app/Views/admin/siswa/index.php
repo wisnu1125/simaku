@@ -1,381 +1,507 @@
 <?= $this->include('admin/layouts/header') ?>
 
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-
 <style>
-/* ==================== BLUISH TEAL THEME ==================== */
-:root {
-    --primary: #0891b2;       /* Cyan 600 */
-    --primary-hover: #0e7490; /* Cyan 700 */
-    --primary-light: #cffafe; /* Cyan 100 */
-    --primary-bg: #ecfeff;    /* Cyan 50 */
-    --secondary: #64748b;
-    --text-main: #0f172a;
-    --border: #e2e8f0;
-    --radius: 12px;
-}
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+@media (min-width: 640px) { .stat-grid { gap: 16px; } }
+.stat-card { padding: 14px 16px; }
+@media (min-width: 640px) { .stat-card { padding: 18px 20px; } }
+.stat-card .value { font-size: 19px; font-weight: 900; color: var(--ink); }
+@media (min-width: 640px) { .stat-card .value { font-size: 24px; } }
+.stat-card .label { font-size: 10.5px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .3px; margin-top: 2px; }
 
-body {
-    background: #f8fafc;
-    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-    color: var(--text-main);
-}
+.toolbar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+@media (min-width: 768px) { .toolbar { flex-direction: row; } }
+.toolbar .search-wrap { position: relative; flex: 1; }
+.toolbar .search-wrap i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--faint); }
+.toolbar .search-wrap input { padding-left: 38px; }
+.toolbar select { width: 100%; }
+@media (min-width: 768px) { .toolbar select { width: 170px; flex-shrink: 0; } }
 
-/* ==================== PAGE HEADER ==================== */
-.page-header {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 24px;
-}
-.page-title {
-    font-size: 24px; font-weight: 800; color: var(--text-main);
-    letter-spacing: -0.5px;
-}
+.va-code { font-family: 'Roboto Mono', monospace; background: var(--border-soft); padding: 3px 8px; border-radius: 6px; color: var(--brand-darker); font-size: 12px; }
 
-/* ==================== BUTTONS ==================== */
-.btn {
-    padding: 10px 20px; border-radius: 10px; text-decoration: none;
-    font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;
-    transition: all 0.2s; border: none; cursor: pointer;
-}
-.btn-primary {
-    background: linear-gradient(135deg, #06b6d4, #0891b2);
-    color: white; box-shadow: 0 4px 12px rgba(8, 145, 178, 0.3);
-}
-.btn-primary:hover {
-    transform: translateY(-2px); box-shadow: 0 6px 15px rgba(8, 145, 178, 0.4);
-}
-.btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+/* --- Mobile card list --- */
+.siswa-card { padding: 14px; display: flex; align-items: center; gap: 12px; }
+.siswa-card .avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--brand-bg); color: var(--brand-darker); display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
+.siswa-card .body { flex: 1; min-width: 0; }
+.siswa-card .name { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.siswa-card .meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.siswa-card .actions { display: flex; gap: 6px; flex-shrink: 0; }
 
-/* Action Buttons in Table */
-.btn-action {
-    width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
-    border-radius: 8px; transition: 0.2s; color: white; margin-right: 4px; border: none;
-}
-.btn-view { background: #3b82f6; box-shadow: 0 2px 5px rgba(59, 130, 246, 0.3); }
-.btn-edit { background: #f59e0b; box-shadow: 0 2px 5px rgba(245, 158, 11, 0.3); }
-.btn-delete { background: #ef4444; box-shadow: 0 2px 5px rgba(239, 68, 68, 0.3); cursor: pointer; }
-.btn-action:hover { transform: translateY(-2px); filter: brightness(110%); }
+.pager { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--border-soft); font-size: 12.5px; color: var(--muted); }
+.pager .btns { display: flex; gap: 6px; }
 
-/* ==================== STATS ROW ==================== */
-.stats-row {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 20px; margin-bottom: 24px;
-}
-.stat-box {
-    background: white; border-radius: 16px; padding: 24px;
-    border: 1px solid var(--border); box-shadow: 0 2px 10px rgba(0,0,0,0.03);
-    position: relative; overflow: hidden; display: flex; flex-direction: column;
-}
-/* Aksen Warna Stat Box */
-.stat-box.blue { border-bottom: 4px solid var(--primary); }
-.stat-box.green { border-bottom: 4px solid #10b981; }
-.stat-box.indigo { border-bottom: 4px solid #6366f1; }
-
-.stat-icon {
-    position: absolute; top: 20px; right: 20px; font-size: 40px; opacity: 0.1;
-    color: var(--text-main);
-}
-.stat-value { font-size: 32px; font-weight: 800; color: var(--text-main); line-height: 1; margin-bottom: 8px; }
-.stat-label { font-size: 13px; font-weight: 600; color: var(--secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-
-/* ==================== FILTER CARD ==================== */
-.filter-card {
-    background: white; border-radius: 16px; padding: 20px;
-    border: 1px solid var(--border); margin-bottom: 24px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
-}
-.filter-grid {
-    display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px;
-}
-.filter-group label {
-    display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; 
-    color: var(--secondary); text-transform: uppercase;
-}
-.filter-input {
-    width: 100%; padding: 10px 14px; border: 1px solid var(--border);
-    border-radius: 10px; font-size: 14px; transition: 0.2s; background: #f8fafc;
-}
-.filter-input:focus {
-    outline: none; border-color: var(--primary); background: white;
-    box-shadow: 0 0 0 3px var(--primary-bg);
-}
-
-/* ==================== CARD TABLE ==================== */
-.card-table {
-    background: white; border-radius: 16px; border: 1px solid var(--border);
-    overflow: hidden; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-}
-
-/* ==================== DATATABLES CUSTOMIZATION (FIXED) ==================== */
-/* Sembunyikan search & length bawaan */
-.dataTables_wrapper .dataTables_filter, 
-.dataTables_wrapper .dataTables_length { display: none; }
-
-table.dataTable { border-collapse: collapse !important; width: 100% !important; margin-top: 0 !important; }
-
-/* Header Table */
-table.dataTable thead th {
-    background: #f1f5f9; color: var(--secondary); font-size: 12px; font-weight: 700;
-    text-transform: uppercase; padding: 16px !important; border-bottom: 1px solid var(--border) !important;
-}
-
-/* Body Table */
-table.dataTable tbody td {
-    padding: 16px !important; border-bottom: 1px solid #f8fafc !important;
-    font-size: 14px; color: var(--text-main); vertical-align: middle;
-}
-table.dataTable tbody tr:hover { background-color: var(--primary-bg) !important; }
-
-/* --- PAGINATION STYLING --- */
-.dataTables_wrapper .dataTables_paginate {
-    margin-top: 20px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 6px;
-    padding-top: 10px;
-}
-
-/* Style Tombol Umum (Angka, Prev, Next) */
-.dataTables_wrapper .dataTables_paginate .paginate_button {
-    border-radius: 8px !important;
-    padding: 8px 14px !important;
-    border: 1px solid var(--border) !important;
-    background: white !important;
-    color: var(--secondary) !important;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer !important; /* WAJIB ADA AGAR BISA DIKLIK */
-    user-select: none;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* Style Saat Hover (Kecuali Disabled) */
-.dataTables_wrapper .dataTables_paginate .paginate_button:not(.disabled):hover {
-    background: var(--primary-bg) !important;
-    color: var(--primary) !important;
-    border-color: var(--primary-light) !important;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 5px rgba(8, 145, 178, 0.1);
-}
-
-/* Style Tombol Aktif (Halaman Sekarang) */
-.dataTables_wrapper .dataTables_paginate .paginate_button.current,
-.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
-    background: linear-gradient(135deg, #06b6d4, #0891b2) !important;
-    color: white !important;
-    border-color: var(--primary) !important;
-    box-shadow: 0 4px 6px rgba(8, 145, 178, 0.25);
-    cursor: default !important;
-}
-
-/* Style Tombol Disabled (Prev di hal 1, Next di hal akhir) */
-.dataTables_wrapper .dataTables_paginate .paginate_button.disabled,
-.dataTables_wrapper .dataTables_paginate .paginate_button.disabled:hover,
-.dataTables_wrapper .dataTables_paginate .paginate_button.disabled:active {
-    cursor: not-allowed !important;
-    opacity: 0.5;
-    background: #f1f5f9 !important;
-    color: #cbd5e1 !important;
-    border-color: #e2e8f0 !important;
-    transform: none !important;
-    box-shadow: none !important;
-}
-
-.dataTables_wrapper .dataTables_info {
-    margin-top: 24px; font-size: 13px; color: var(--secondary); font-weight: 500;
-}
-
-/* ==================== BADGES & UTILS ==================== */
-.badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
-.badge-success { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-.badge-indigo { background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; }
-.badge-danger { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
-.badge-gray { background: #f1f5f9; color: #64748b; }
-
-.va-code {
-    font-family: 'SF Mono', 'Monaco', monospace; background: #f1f5f9;
-    padding: 4px 8px; border-radius: 6px; color: var(--primary); font-size: 12px; border: 1px solid var(--border);
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .filter-grid { grid-template-columns: 1fr; }
-    .page-header { flex-direction: column; align-items: flex-start; gap: 16px; }
-}
+.va-hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
 </style>
 
-<div class="page-header">
-    <h1 class="page-title">Data Siswa</h1>
-    <a href="<?= base_url('admin/siswa/create') ?>" class="btn btn-primary">
-        <i class="fas fa-plus"></i> Tambah Siswa
-    </a>
+<div class="page-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:10px;">
+    <div>
+        <div class="page-title">Data Siswa</div>
+        <div class="page-subtitle" id="resultCount">Memuat…</div>
+    </div>
+    <button class="btn btn-primary" onclick="openCreateModal()"><i class="fa-solid fa-plus"></i> <span class="hide-xs">Tambah Siswa</span></button>
 </div>
 
-<?php
-// Hitung manual untuk statistik (karena pagination pake JS)
-$totalSiswa = count($siswa);
-$siswaAktif = count(array_filter($siswa, fn($s) => $s['status_siswa'] === 'aktif'));
-$siswaLulus = count(array_filter($siswa, fn($s) => $s['status_siswa'] === 'lulus'));
-?>
-
-<div class="stats-row">
-    <div class="stat-box blue">
-        <i class="fas fa-users stat-icon"></i>
-        <div class="stat-value"><?= number_format($totalSiswa) ?></div>
-        <div class="stat-label">Total Siswa</div>
+<div class="stat-grid">
+    <div class="card stat-card">
+        <div class="value" id="statTotal">0</div>
+        <div class="label">Total</div>
     </div>
-    <div class="stat-box green">
-        <i class="fas fa-user-check stat-icon" style="color: #10b981; opacity: 0.1;"></i>
-        <div class="stat-value" style="color: #059669;"><?= number_format($siswaAktif) ?></div>
-        <div class="stat-label">Siswa Aktif</div>
+    <div class="card stat-card">
+        <div class="value" style="color:var(--success);" id="statAktif">0</div>
+        <div class="label">Aktif</div>
     </div>
-    <div class="stat-box indigo">
-        <i class="fas fa-user-graduate stat-icon" style="color: #6366f1; opacity: 0.1;"></i>
-        <div class="stat-value" style="color: #4f46e5;"><?= number_format($siswaLulus) ?></div>
-        <div class="stat-label">Siswa Lulus</div>
+    <div class="card stat-card">
+        <div class="value" style="color:var(--info);" id="statLulus">0</div>
+        <div class="label">Lulus</div>
     </div>
 </div>
 
-<div class="filter-card">
-    <div class="filter-grid">
-        <div class="filter-group">
-            <label><i class="fas fa-search"></i> Pencarian Cepat</label>
-            <input type="text" id="customSearch" class="filter-input" placeholder="Cari Nama, NIS, atau VA...">
-        </div>
-        
-        <div class="filter-group">
-            <label><i class="fas fa-school"></i> Filter Kelas</label>
-            <select id="filterKelas" class="filter-input">
-                <option value="">Semua Kelas</option>
-                <?php if (isset($kelas_list)): ?>
-                    <?php foreach ($kelas_list as $k): ?>
-                        <option value="<?= esc($k['nama_kelas']) ?>"><?= esc($k['nama_kelas']) ?></option>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </select>
-        </div>
-        
-        <div class="filter-group">
-            <label><i class="fas fa-flag"></i> Filter Status</label>
-            <select id="filterStatus" class="filter-input">
-                <option value="">Semua Status</option>
-                <option value="Aktif">Aktif</option>
-                <option value="Nonaktif">Nonaktif</option>
-                <option value="Lulus">Lulus</option>
-            </select>
-        </div>
+<div class="toolbar">
+    <div class="search-wrap">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" class="input" id="q" placeholder="Cari nama, NIS, atau VA…">
     </div>
+    <select class="input" id="fKelas">
+        <option value="">Semua Kelas</option>
+        <?php foreach ($kelas_list as $k): ?>
+            <option value="<?= esc($k['nama_kelas']) ?>"><?= esc($k['nama_kelas']) ?></option>
+        <?php endforeach; ?>
+    </select>
+    <select class="input" id="fStatus">
+        <option value="">Semua Status</option>
+        <option value="aktif">Aktif</option>
+        <option value="nonaktif">Nonaktif</option>
+        <option value="lulus">Lulus</option>
+    </select>
 </div>
 
-<div class="card-table">
-    <table id="tableSiswa" class="display" style="width:100%">
-        <thead>
-            <tr>
-                <th width="5%">No</th>
-                <th width="8%">NIS</th>
-                <th>Tanggal Lahir</th>
-                <th>Nama Lengkap</th>
-                <th>Kelas</th>
-                <th>VA (Virtual Account)</th>
-                <th class="text-center">Status</th>
-                <th width="15%" class="text-center">Aksi</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($siswa as $index => $s): ?>
-            <tr>
-                <td style="text-align: center; color: #64748b; font-weight: 600;"><?= $index + 1 ?></td>
-                <td><strong style="color: var(--primary); font-family: monospace; font-size: 14px;"><?= esc($s['nis']) ?></strong></td>
-                <td><?= date('d/m/Y', strtotime($s['tanggal_lahir'])) ?></td>
-                <td>
-                    <div style="font-weight: 700; color: var(--text-main);"><?= esc($s['nama_lengkap']) ?></div>
-                    <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">
-                        <i class="fas fa-<?= $s['jenis_kelamin'] === 'L' ? 'mars' : 'venus' ?>"></i>
-                        <?= $s['jenis_kelamin'] === 'L' ? 'Laki-laki' : 'Perempuan' ?>
+<!-- Desktop table -->
+<div class="card" style="overflow:hidden;">
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>NIS</th>
+                    <th>Nama Lengkap</th>
+                    <th>Kelas</th>
+                    <th>Virtual Account</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+    <!-- Mobile card list -->
+    <div class="row-list" id="cardList" style="padding:10px;"></div>
+
+    <div id="emptyState" style="display:none;"></div>
+    <div class="pager" id="pager"></div>
+</div>
+
+<!-- ===================== MODAL: Tambah / Edit Siswa ===================== -->
+<div class="overlay" id="siswaModal_overlay" onclick="closeModal('siswaModal')"></div>
+<div class="modal modal-wide" id="siswaModal">
+    <div class="modal-drag"></div>
+    <div class="modal-header">
+        <h3 id="siswaModalTitle">Tambah Siswa</h3>
+        <button type="button" class="modal-close" onclick="closeModal('siswaModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="siswaForm" action="<?= base_url('admin/siswa/store') ?>" method="POST">
+        <input type="hidden" name="editing_id" id="f_editing_id" value="<?= esc(old('editing_id', '')) ?>">
+        <div class="modal-body">
+
+            <div class="eyebrow" style="margin-bottom:10px;">Identitas Siswa</div>
+            <div class="field-row">
+                <div class="field">
+                    <label class="required">NIS</label>
+                    <input class="input <?= isset($errors['nis']) ? 'is-invalid' : '' ?>" name="nis" id="f_nis" placeholder="Contoh: 2024001" value="<?= esc(old('nis', '')) ?>" required>
+                    <?php if (isset($errors['nis'])): ?><div class="field-error"><?= $errors['nis'] ?></div><?php endif; ?>
+                </div>
+                <div class="field">
+                    <label>NISN</label>
+                    <input class="input" name="nisn" id="f_nisn" placeholder="Nomor Induk Siswa Nasional" value="<?= esc(old('nisn', '')) ?>">
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="required">Nama Lengkap</label>
+                <input class="input <?= isset($errors['nama_lengkap']) ? 'is-invalid' : '' ?>" name="nama_lengkap" id="f_nama_lengkap" placeholder="Sesuai ijazah" value="<?= esc(old('nama_lengkap', '')) ?>" required>
+            </div>
+
+            <div class="field-row">
+                <div class="field">
+                    <label class="required">Tanggal Lahir</label>
+                    <input type="date" class="input" name="tanggal_lahir" id="f_tanggal_lahir" value="<?= esc(old('tanggal_lahir', '')) ?>" required>
+                </div>
+                <div class="field">
+                    <label class="required">Jenis Kelamin</label>
+                    <div class="segmented">
+                        <label><input type="radio" name="jenis_kelamin" value="L" id="f_jk_l"> Laki-laki</label>
+                        <label><input type="radio" name="jenis_kelamin" value="P" id="f_jk_p"> Perempuan</label>
                     </div>
-                </td>
-                <td>
-                    <?php if (!empty($s['nama_kelas'])): ?>
-                        <span class="badge badge-gray"><i class="fas fa-school" style="margin-right:4px"></i> <?= esc($s['nama_kelas']) ?></span>
-                    <?php else: ?>
-                        <span style="color: #94a3b8; font-size: 12px; font-style: italic;">-</span>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <span class="va-code"><?= esc($s['virtual_account']) ?></span>
-                </td>
-                <td class="text-center">
-                    <?php if ($s['status_siswa'] === 'aktif'): ?>
-                        <span class="badge badge-success">Aktif</span>
-                    <?php elseif ($s['status_siswa'] === 'lulus'): ?>
-                        <span class="badge badge-indigo">Lulus</span>
-                    <?php else: ?>
-                        <span class="badge badge-danger">Nonaktif</span>
-                    <?php endif; ?>
-                    <span style="display:none;"><?= ucfirst($s['status_siswa']) ?></span>
-                </td>
-                <td class="text-center">
-                    <a href="<?= base_url('admin/siswa/detail/' . $s['id_siswa']) ?>" class="btn-action btn-view" title="Lihat">
-                        <i class="fas fa-eye" style="font-size: 12px;"></i>
-                    </a>
-                    <a href="<?= base_url('admin/siswa/edit/' . $s['id_siswa']) ?>" class="btn-action btn-edit" title="Edit">
-                        <i class="fas fa-pencil" style="font-size: 12px;"></i>
-                    </a>
-                    <form action="<?= base_url('admin/siswa/delete/' . $s['id_siswa']) ?>" method="POST" style="display: inline;">
-                        <button type="submit" class="btn-action btn-delete" title="Hapus" onclick="return confirm('Yakin hapus siswa ini?')">
-                            <i class="fas fa-trash" style="font-size: 12px;"></i>
-                        </button>
-                    </form>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
+                </div>
+            </div>
+
+            <div class="field">
+                <label>Alamat</label>
+                <textarea class="input" name="alamat" id="f_alamat" rows="2" placeholder="Alamat domisili saat ini"><?= esc(old('alamat', '')) ?></textarea>
+            </div>
+
+            <div class="eyebrow" style="margin:18px 0 10px;">Kontak Wali</div>
+            <div class="field-row">
+                <div class="field">
+                    <label>Nama Wali</label>
+                    <input class="input" name="nama_wali" id="f_nama_wali" placeholder="Nama Ayah/Ibu/Wali" value="<?= esc(old('nama_wali', '')) ?>">
+                </div>
+                <div class="field">
+                    <label>No. Telepon</label>
+                    <input class="input" name="telp_wali" id="f_telp_wali" placeholder="08xxxxxxxxxx" value="<?= esc(old('telp_wali', '')) ?>">
+                </div>
+            </div>
+
+            <div class="eyebrow" style="margin:18px 0 10px;">Kelas &amp; Pembayaran</div>
+            <div class="field-row">
+                <div class="field">
+                    <label>Kelas</label>
+                    <select class="input" name="id_kelas" id="f_id_kelas">
+                        <option value="">— Belum ada kelas —</option>
+                        <?php foreach ($kelas_list as $k): ?>
+                            <option value="<?= $k['id_kelas'] ?>"><?= esc($k['nama_kelas']) ?> (<?= esc($k['nama_tahun_ajaran'] ?? '-') ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="field" id="f_status_wrap" style="display:none;">
+                    <label class="required">Status Akademik</label>
+                    <select class="input" name="status_siswa" id="f_status_siswa">
+                        <option value="aktif">Aktif</option>
+                        <option value="nonaktif">Nonaktif</option>
+                        <option value="lulus">Lulus</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="field">
+                <label>Virtual Account</label>
+                <div style="display:flex; gap:8px;">
+                    <input class="input" name="virtual_account" id="f_va" placeholder="Klik Generate atau isi manual" value="<?= esc(old('virtual_account', '')) ?>">
+                    <button type="button" class="btn btn-secondary" id="f_va_btn" onclick="generateVA()"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                </div>
+                <div class="va-hint">Format otomatis: 88 + 10 digit NIS. Kosongkan saat tambah baru untuk generate otomatis.</div>
+            </div>
+
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('siswaModal')">Batal</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Simpan</button>
+        </div>
+    </form>
+</div>
+
+<!-- ===================== DRAWER: Detail Siswa ===================== -->
+<div class="overlay" id="siswaDrawer_overlay" onclick="closeDrawer('siswaDrawer')"></div>
+<div class="drawer" id="siswaDrawer">
+    <div class="drawer-header">
+        <button class="modal-close" onclick="closeDrawer('siswaDrawer')"><i class="fa-solid fa-arrow-left"></i></button>
+        <h3>Detail Siswa</h3>
+    </div>
+    <div class="drawer-body" id="drawerBody">
+        <div class="drawer-skeleton"><i class="fa-solid fa-spinner fa-spin" style="font-size:22px;"></i><span>Memuat…</span></div>
+    </div>
 </div>
 
 <script>
-    $(document).ready(function() {
-        // Inisialisasi DataTables
-        var table = $('#tableSiswa').DataTable({
-            "language": {
-                "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/id.json",
-                "paginate": {
-                    "previous": "<i class='fas fa-chevron-left'></i>",
-                    "next": "<i class='fas fa-chevron-right'></i>"
-                }
-            },
-            "pagingType": "simple_numbers",
-            "pageLength": 10,
-            "lengthChange": false, 
-            "dom": 'rtip', 
-            "ordering": true,
-            "columnDefs": [
-                { "orderable": false, "targets": 7 } 
-            ]
-        });
+const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
+const LIST_URL = '<?= base_url('admin/siswa') ?>';
+const HAS_ERRORS = <?= !empty($errors) ? 'true' : 'false' ?>;
+const OLD_EDITING_ID = <?= json_encode(old('editing_id', ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
-        // 1. Custom Search Box (Pencarian Global)
-        $('#customSearch').on('keyup', function() {
-            table.search(this.value).draw();
-        });
+let page = 1;
+const PER_PAGE = 12;
+let q = '', fKelas = '', fStatus = '';
+let currentRows = [];
+let fetchToken = 0;
 
-        // 2. Custom Filter Kelas (KOLOM DIUBAH KE INDEX 4 KARENA ADA KOLOM BARU)
-        $('#filterKelas').on('change', function() {
-            var val = $.fn.dataTable.util.escapeRegex($(this).val());
-            table.column(4).search(val ? val : '', true, false).draw();
-        });
+function initial(name) { return (name || '?').trim().charAt(0).toUpperCase(); }
+function statusBadge(s) {
+    if (s === 'aktif') return '<span class="badge badge-success">Aktif</span>';
+    if (s === 'lulus') return '<span class="badge badge-info">Lulus</span>';
+    return '<span class="badge badge-danger">Nonaktif</span>';
+}
+function esc(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
+function fmt(n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+function fmtDate(d) { if (!d) return '—'; const dt = new Date(d); return dt.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-        // 3. Custom Filter Status (KOLOM DIUBAH KE INDEX 6 KARENA ADA KOLOM BARU)
-        $('#filterStatus').on('change', function() {
-            var val = $.fn.dataTable.util.escapeRegex($(this).val());
-            table.column(6).search(val ? val : '', true, false).draw();
+function showSkeleton() {
+    let html = '';
+    for (let i = 0; i < 4; i++) html += '<div class="skeleton-row"><div class="skeleton-bar" style="width:60%;"></div><div class="skeleton-bar" style="width:35%;"></div></div>';
+    document.getElementById('cardList').innerHTML = html;
+    document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" style="padding:0;">' + html + '</td></tr>';
+}
+
+async function loadPage() {
+    const myToken = ++fetchToken;
+    showSkeleton();
+    document.getElementById('emptyState').style.display = 'none';
+
+    const params = new URLSearchParams({ page, per_page: PER_PAGE });
+    if (q) params.set('q', q);
+    if (fKelas) params.set('kelas', fKelas);
+    if (fStatus) params.set('status', fStatus);
+
+    let data;
+    try {
+        const res = await fetch(LIST_URL + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        data = await res.json();
+    } catch (e) {
+        document.getElementById('resultCount').textContent = 'Gagal memuat data.';
+        return;
+    }
+    if (myToken !== fetchToken) return; // ada request lebih baru menyusul, hasil ini basi -> abaikan
+
+    currentRows = data.rows;
+    document.getElementById('statTotal').textContent = data.stats.total;
+    document.getElementById('statAktif').textContent = data.stats.aktif;
+    document.getElementById('statLulus').textContent = data.stats.lulus;
+    document.getElementById('resultCount').textContent = data.total + ' dari ' + data.stats.total + ' siswa';
+
+    const tbody = document.getElementById('tableBody');
+    const cardList = document.getElementById('cardList');
+    const emptyState = document.getElementById('emptyState');
+
+    if (currentRows.length === 0) {
+        tbody.innerHTML = ''; cardList.innerHTML = '';
+        emptyState.style.display = 'block';
+        emptyState.innerHTML = '<div class="empty-state"><i class="fa-solid fa-user-slash"></i><p>Tidak ada siswa yang cocok dengan pencarian ini.</p></div>';
+    } else {
+        emptyState.style.display = 'none';
+
+        tbody.innerHTML = currentRows.map(s => `
+            <tr>
+                <td><span class="mono">${esc(s.nis)}</span></td>
+                <td>
+                    <div style="font-weight:700; color:var(--ink);">${esc(s.nama_lengkap)}</div>
+                    <div style="font-size:11.5px; color:var(--muted);"><i class="fa-solid fa-${s.jenis_kelamin === 'L' ? 'mars' : 'venus'}"></i> ${s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</div>
+                </td>
+                <td>${s.nama_kelas ? '<span class="badge badge-neutral">' + esc(s.nama_kelas) + '</span>' : '<span style="color:var(--faint);">—</span>'}</td>
+                <td><span class="va-code">${esc(s.virtual_account)}</span></td>
+                <td>${statusBadge(s.status_siswa)}</td>
+                <td style="text-align:right;">
+                    <button class="icon-action" title="Detail" onclick="openDetailDrawer(${s.id_siswa})"><i class="fa-solid fa-eye"></i></button>
+                    <button class="icon-action" title="Edit" onclick="openEditModal(${s.id_siswa})"><i class="fa-solid fa-pencil"></i></button>
+                    <button class="icon-action danger" title="Hapus" onclick="hapusSiswa(${s.id_siswa}, '${esc(s.nama_lengkap).replace(/'/g, "\\'")}')"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>
+        `).join('');
+
+        cardList.innerHTML = currentRows.map(s => `
+            <div class="card siswa-card">
+                <div class="avatar">${initial(s.nama_lengkap)}</div>
+                <div class="body" onclick="openDetailDrawer(${s.id_siswa})">
+                    <div class="name">${esc(s.nama_lengkap)}</div>
+                    <div class="meta">
+                        <span class="mono">${esc(s.nis)}</span>
+                        ${s.nama_kelas ? '<span>· ' + esc(s.nama_kelas) + '</span>' : ''}
+                        ${statusBadge(s.status_siswa)}
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="icon-action" title="Edit" onclick="openEditModal(${s.id_siswa})"><i class="fa-solid fa-pencil"></i></button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    const pager = document.getElementById('pager');
+    if (data.total_pages > 1) {
+        pager.style.display = 'flex';
+        pager.innerHTML = `
+            <span>Halaman ${data.page} dari ${data.total_pages}</span>
+            <div class="btns">
+                <button class="icon-action" ${data.page <= 1 ? 'disabled' : ''} onclick="gotoPage(${data.page - 1})"><i class="fa-solid fa-chevron-left"></i></button>
+                <button class="icon-action" ${data.page >= data.total_pages ? 'disabled' : ''} onclick="gotoPage(${data.page + 1})"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+        `;
+    } else {
+        pager.style.display = 'none';
+    }
+}
+function gotoPage(p) { page = p; loadPage(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+let searchDebounce;
+document.getElementById('q').addEventListener('input', function () {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => { q = this.value.trim(); page = 1; loadPage(); }, 350);
+});
+document.getElementById('fKelas').addEventListener('change', function () { fKelas = this.value; page = 1; loadPage(); });
+document.getElementById('fStatus').addEventListener('change', function () { fStatus = this.value; page = 1; loadPage(); });
+
+// ===================== MODAL: Tambah / Edit =====================
+function resetForm() {
+    document.getElementById('siswaForm').reset();
+    document.getElementById('f_editing_id').value = '';
+}
+
+function openCreateModal() {
+    resetForm();
+    document.getElementById('siswaModalTitle').textContent = 'Tambah Siswa';
+    document.getElementById('siswaForm').action = BASE_URL + '/admin/siswa/store';
+    document.getElementById('f_status_wrap').style.display = 'none';
+    document.getElementById('f_status_siswa').removeAttribute('required');
+    document.getElementById('f_va_btn').style.display = 'inline-flex';
+    openModal('siswaModal');
+}
+
+function fillEditForm(s) {
+    document.getElementById('f_editing_id').value = s.id_siswa;
+    document.getElementById('siswaModalTitle').textContent = 'Edit — ' + s.nama_lengkap;
+    document.getElementById('siswaForm').action = BASE_URL + '/admin/siswa/update/' + s.id_siswa;
+
+    document.getElementById('f_nis').value = s.nis || '';
+    document.getElementById('f_nisn').value = s.nisn || '';
+    document.getElementById('f_nama_lengkap').value = s.nama_lengkap || '';
+    document.getElementById('f_tanggal_lahir').value = s.tanggal_lahir || '';
+    document.getElementById('f_jk_l').checked = s.jenis_kelamin === 'L';
+    document.getElementById('f_jk_p').checked = s.jenis_kelamin === 'P';
+    document.getElementById('f_alamat').value = s.alamat || '';
+    document.getElementById('f_nama_wali').value = s.nama_wali || '';
+    document.getElementById('f_telp_wali').value = s.telp_wali || '';
+    document.getElementById('f_id_kelas').value = s.id_kelas || '';
+    document.getElementById('f_va').value = s.virtual_account || '';
+
+    document.getElementById('f_status_wrap').style.display = 'block';
+    document.getElementById('f_status_siswa').setAttribute('required', 'required');
+    document.getElementById('f_status_siswa').value = s.status_siswa || 'aktif';
+    document.getElementById('f_va_btn').style.display = 'none';
+
+    openModal('siswaModal');
+}
+
+function openEditModal(id) {
+    // Kalau datanya sudah ada di halaman yang lagi tampil, langsung pakai (instan, tanpa request).
+    const cached = currentRows.find(x => x.id_siswa == id);
+    if (cached) { resetForm(); fillEditForm(cached); return; }
+
+    // Kalau tidak (mis. dibuka dari drawer setelah pindah halaman), ambil datanya dulu.
+    fetch(BASE_URL + '/admin/siswa/detail/' + id, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => { if (data.siswa) { resetForm(); fillEditForm(data.siswa); } });
+}
+
+function generateVA() {
+    const nis = document.getElementById('f_nis').value;
+    if (!nis) { alert('Isi NIS terlebih dahulu.'); document.getElementById('f_nis').focus(); return; }
+    document.getElementById('f_va').value = '88' + nis.padStart(10, '0');
+}
+
+function hapusSiswa(id, nama) {
+    if (!confirm('Hapus siswa "' + nama + '"? Tindakan ini tidak bisa dibatalkan.')) return;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = BASE_URL + '/admin/siswa/delete/' + id;
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// ===================== DRAWER: Detail =====================
+function openDetailDrawer(id) {
+    openDrawer('siswaDrawer');
+    document.getElementById('drawerBody').innerHTML = '<div class="drawer-skeleton"><i class="fa-solid fa-spinner fa-spin" style="font-size:22px;"></i><span>Memuat…</span></div>';
+
+    fetch(BASE_URL + '/admin/siswa/detail/' + id, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                document.getElementById('drawerBody').innerHTML = '<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>' + esc(data.error) + '</p></div>';
+                return;
+            }
+            renderDrawer(data);
+        })
+        .catch(() => {
+            document.getElementById('drawerBody').innerHTML = '<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Gagal memuat detail siswa.</p></div>';
         });
-    });
+}
+
+function renderDrawer(data) {
+    const s = data.siswa;
+    const r = data.ringkasan;
+    const waLink = s.telp_wali ? 'https://wa.me/' + s.telp_wali.replace(/[^0-9]/g, '') : null;
+
+    let html = `
+        <div style="text-align:center; margin-bottom:18px;">
+            <div class="avatar" style="width:64px;height:64px;font-size:22px;margin:0 auto 10px;">${initial(s.nama_lengkap)}</div>
+            <div style="font-size:16px; font-weight:800; color:var(--ink);">${esc(s.nama_lengkap)}</div>
+            <div style="font-size:12.5px; color:var(--muted);">NIS ${esc(s.nis)}</div>
+            <div style="margin-top:8px;">${statusBadge(s.status_siswa)}</div>
+        </div>
+
+        <div class="card" style="padding:14px; margin-bottom:16px; display:flex; gap:10px;">
+            <button class="btn btn-primary btn-block btn-sm" onclick="closeDrawer('siswaDrawer'); openEditModal(${s.id_siswa});"><i class="fa-solid fa-pencil"></i> Edit</button>
+            <a class="btn btn-secondary btn-block btn-sm" href="${BASE_URL}/admin/pembayaran#bayar-${s.id_siswa}"><i class="fa-solid fa-wallet"></i> Bayar</a>
+        </div>
+
+        <div class="eyebrow" style="margin-bottom:8px;">Ringkasan Keuangan</div>
+        <div class="card" style="padding:4px 16px; margin-bottom:18px;">
+            <div class="info-row"><span class="k">Total Tagihan</span><span class="v">Rp ${fmt(r.total_tagihan)}</span></div>
+            <div class="info-row"><span class="k">Sudah Dibayar</span><span class="v" style="color:var(--success);">Rp ${fmt(r.total_dibayar)}</span></div>
+            <div class="info-row"><span class="k">Sisa Tagihan</span><span class="v" style="color:${r.total_sisa > 0 ? 'var(--danger)' : 'var(--success)'};">Rp ${fmt(r.total_sisa)}</span></div>
+        </div>
+
+        <div class="eyebrow" style="margin-bottom:8px;">Data Pribadi</div>
+        <div class="card" style="padding:4px 16px; margin-bottom:18px;">
+            <div class="info-row"><span class="k">NISN</span><span class="v">${s.nisn ? esc(s.nisn) : '—'}</span></div>
+            <div class="info-row"><span class="k">Jenis Kelamin</span><span class="v">${s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</span></div>
+            <div class="info-row"><span class="k">Tanggal Lahir</span><span class="v">${fmtDate(s.tanggal_lahir)}</span></div>
+            <div class="info-row"><span class="k">Kelas</span><span class="v">${s.nama_kelas ? esc(s.nama_kelas) : 'Belum ada kelas'}</span></div>
+            <div class="info-row"><span class="k">Virtual Account</span><span class="v mono">${esc(s.virtual_account)}</span></div>
+        </div>
+
+        <div class="eyebrow" style="margin-bottom:8px;">Wali</div>
+        <div class="card" style="padding:4px 16px; margin-bottom:18px;">
+            <div class="info-row"><span class="k">Nama</span><span class="v">${s.nama_wali ? esc(s.nama_wali) : '—'}</span></div>
+            <div class="info-row"><span class="k">Telepon</span><span class="v">${s.telp_wali ? esc(s.telp_wali) : '—'} ${waLink ? '<a href="' + waLink + '" target="_blank" style="color:var(--success); margin-left:6px;"><i class="fa-brands fa-whatsapp"></i></a>' : ''}</span></div>
+        </div>
+    `;
+
+    if (data.tagihan_terbaru && data.tagihan_terbaru.length > 0) {
+        html += `<div class="eyebrow" style="margin-bottom:8px;">Tagihan Terbaru</div><div class="card" style="padding:4px 16px; margin-bottom:10px;">`;
+        data.tagihan_terbaru.forEach(t => {
+            html += `<div class="info-row"><span class="k">${esc(t.nama_tagihan)}${t.bulan_tagihan ? ' (Bln ' + t.bulan_tagihan + ')' : ''}</span><span class="v">${t.status_tagihan === 'lunas' ? '<span class="badge badge-success">Lunas</span>' : 'Rp ' + fmt(t.sisa_tagihan)}</span></div>`;
+        });
+        html += `</div><a href="${BASE_URL}/admin/tagihan/detail/${s.id_siswa}" style="font-size:12.5px; font-weight:700; color:var(--brand);">Lihat semua tagihan <i class="fa-solid fa-arrow-right"></i></a>`;
+    }
+
+    document.getElementById('drawerBody').innerHTML = html;
+}
+
+// ===================== Buka otomatis dari hash / error validasi =====================
+function handleHash() {
+    const h = location.hash;
+    if (h === '#tambah') { openCreateModal(); }
+    else if (h.startsWith('#edit-')) { openEditModal(parseInt(h.replace('#edit-', ''), 10)); }
+    else if (h.startsWith('#detail-')) { openDetailDrawer(parseInt(h.replace('#detail-', ''), 10)); }
+}
+
+loadPage();
+
+if (HAS_ERRORS) {
+    // Form baru saja ditolak validasi -> field-field sudah keisi ulang oleh PHP (old()) di HTML,
+    // di sini cukup buka modalnya di mode yang sesuai (tidak perlu reset/lookup data lagi).
+    if (OLD_EDITING_ID) {
+        document.getElementById('siswaModalTitle').textContent = 'Edit Siswa';
+        document.getElementById('siswaForm').action = BASE_URL + '/admin/siswa/update/' + OLD_EDITING_ID;
+        document.getElementById('f_status_wrap').style.display = 'block';
+        document.getElementById('f_status_siswa').setAttribute('required', 'required');
+        document.getElementById('f_va_btn').style.display = 'none';
+    } else {
+        document.getElementById('siswaModalTitle').textContent = 'Tambah Siswa';
+        document.getElementById('siswaForm').action = BASE_URL + '/admin/siswa/store';
+        document.getElementById('f_va_btn').style.display = 'inline-flex';
+    }
+    openModal('siswaModal');
+} else if (location.hash) {
+    handleHash();
+}
 </script>
 
 <?= $this->include('admin/layouts/footer') ?>

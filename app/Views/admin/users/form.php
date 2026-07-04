@@ -244,8 +244,8 @@
                     <option value="super_admin" <?= (old('role', $user['role'] ?? '') === 'super_admin') ? 'selected' : '' ?>>
                         Super Admin
                     </option>
-                    <option value="admin" <?= (old('role', $user['role'] ?? '') === 'admin') ? 'selected' : '' ?>>
-                        Admin
+                    <option value="tu_bendahara" <?= (old('role', $user['role'] ?? '') === 'tu_bendahara') ? 'selected' : '' ?>>
+                        TU / Bendahara
                     </option>
                 </select>
                 <?php if (isset($errors['role'])): ?>

@@ -123,16 +123,9 @@ $routes->group('admin', ['filter' => 'auth'], function($routes) {
     $routes->get('laporan/export-tunggakan', 'Admin\LaporanController::exportTunggakan');
     $routes->get('laporan/per-kelas/export', 'Admin\LaporanController::exportPerKelas');
     
-    // Operasional (Pengeluaran & Saldo)
-    $routes->get('operasional', 'Admin\OperasionalController::index');
-    $routes->post('operasional/store', 'Admin\OperasionalController::store');
-    $routes->post('operasional/update/(:num)', 'Admin\OperasionalController::update/$1');
-    $routes->post('operasional/delete/(:num)', 'Admin\OperasionalController::delete/$1');
-    $routes->get('operasional/laporan', 'Admin\OperasionalController::laporan');
-
-    // Saldo Operasional
-    $routes->post('operasional/storeSaldo', 'Admin\OperasionalController::storeSaldo');
-    $routes->post('operasional/deleteSaldo/(:num)', 'Admin\OperasionalController::deleteSaldo/$1');
+    // Operasional (Pengeluaran & Saldo) -- DIHAPUS atas permintaan, tidak diperlukan lagi.
+    // Controller & view-nya masih ada di server (tidak dihapus otomatis dari sini),
+    // tapi sudah tidak reachable sama sekali karena route-nya dicabut.
     
     // User Management (Super Admin Only)
     $routes->group('', ['filter' => 'role:super_admin'], function($routes) {

@@ -1,230 +1,325 @@
 <?= $this->include('admin/layouts/header') ?>
 
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-
 <style>
-/* ==================== CLEAN BLUISH TEAL THEME ==================== */
-:root {
-    --primary: #0891b2;
-    --primary-hover: #0e7490;
-    --primary-bg: #ecfeff;
-    --secondary: #64748b;
-    --text-main: #1e293b;
-    --border: #e2e8f0;
-}
-
-body { 
-    background: #f8fafc; 
-    font-family: 'Inter', sans-serif; 
-    color: var(--text-main);
-}
-
-/* Page Header */
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.page-title { font-size: 24px; font-weight: 700; color: #0f172a; }
-
-/* Buttons */
-.btn-primary { 
-    padding: 10px 20px; border-radius: 8px; text-decoration: none; 
-    font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; 
-    transition: background 0.2s ease;
-    background: var(--primary); color: white; border: none; cursor: pointer;
-}
-.btn-primary:hover { background: var(--primary-hover); }
-
-/* Filter Card */
-.filter-card { background: white; border-radius: 12px; padding: 20px; border: 1px solid var(--border); margin-bottom: 24px; }
-.filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; align-items: flex-end; }
-.filter-group label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: var(--secondary); text-transform: uppercase; }
-.filter-input { 
-    width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; 
-    font-size: 14px; background: #f8fafc; transition: border-color 0.2s;
-}
-.filter-input:focus { outline: none; border-color: var(--primary); background: white; }
-
-/* Table Styles */
-.card-table { background: white; border-radius: 12px; border: 1px solid var(--border); padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-.dataTables_wrapper .dataTables_filter { display: none; } /* Sembunyikan search default */
-
-table.dataTable thead th { 
-    background: #f1f5f9; color: var(--secondary); font-size: 11px; font-weight: 700; 
-    text-transform: uppercase; padding: 12px !important; border-bottom: 1px solid var(--border) !important;
-}
-table.dataTable tbody tr { transition: background 0.15s; }
-table.dataTable tbody tr:hover { background-color: var(--primary-bg) !important; }
-
-/* Badges */
-.badge { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
-.badge-success { background: #dcfce7; color: #15803d; }
-.badge-danger { background: #fee2e2; color: #b91c1c; }
-
-/* Custom Search Box */
-.search-input-client { 
-    width: 300px; padding: 10px 14px; border: 1px solid var(--border); 
-    border-radius: 8px; font-size: 14px; background: #f8fafc; transition: all 0.2s;
-}
-.search-input-client:focus { outline: none; border-color: var(--primary); background: white; width: 320px; }
-
-/* Action Buttons */
-.btn-action { width: 32px; height: 32px; border-radius: 6px; color: white; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: opacity 0.2s; text-decoration: none; }
-.btn-warning { background: #f59e0b; }
-.btn-danger { background: #ef4444; }
-.btn-action:hover { opacity: 0.8; }
-
-.beasiswa-value { font-weight: 700; color: var(--primary); font-family: 'SF Mono', monospace; }
-
-/* Styling teks di dalam tabel agar lebih profesional */
-.text-main-bold {
-    display: block;
-    font-weight: 700;
-    color: #0f172a;
-    font-size: 14px;
-    margin-bottom: 2px;
-}
-
-.text-sub-label {
-    display: block;
-    font-size: 11px;
-    font-weight: 500;
-    color: #64748b;
-    letter-spacing: 0.02em;
-}
-
-.kwitansi-wrapper {
-    display: inline-flex;
-    flex-direction: column;
-}
-
-.nominal-bayar {
-    font-family: 'SF Mono', 'Roboto Mono', monospace;
-    font-weight: 800;
-    color: var(--primary);
-    font-size: 14px;
-}
-
-/* Garis halus pemisah di baris tabel */
-table.dataTable tbody td {
-    border-bottom: 1px solid #f1f5f9 !important;
-    padding: 14px 12px !important;
-}
+.toolbar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+@media (min-width: 768px) { .toolbar { flex-direction: row; } }
+.toolbar .search-wrap { position: relative; flex: 1; }
+.toolbar .search-wrap i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--faint); }
+.toolbar .search-wrap input { padding-left: 38px; }
+.toolbar select { width: 100%; }
+@media (min-width: 768px) { .toolbar select { width: 200px; flex-shrink: 0; } }
+.pager { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--border-soft); font-size: 12.5px; color: var(--muted); }
+.pager .btns { display: flex; gap: 6px; }
+.bs-card { padding: 14px; }
+.bs-card .top { display: flex; justify-content: space-between; gap: 8px; }
+.bs-card .name { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.bs-card .meta { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
 </style>
 
-<div class="page-header">
-    <h1 class="page-title">Data Beasiswa</h1>
-    <a href="<?= base_url('admin/beasiswa/create') ?>" class="btn-primary">
-        <i class="fas fa-plus"></i> Tambah Beasiswa
-    </a>
+<div class="page-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:10px;">
+    <div>
+        <div class="page-title">Beasiswa</div>
+        <div class="page-subtitle" id="resultCount">Memuat…</div>
+    </div>
+    <button class="btn btn-primary" onclick="openCreateModal()"><i class="fa-solid fa-plus"></i> <span class="hide-xs">Tambah</span></button>
 </div>
 
-<div class="filter-card">
-    <form method="GET" action="<?= base_url('admin/beasiswa') ?>" id="filterForm">
-        <div class="filter-grid">
-            <div class="filter-group">
-                <label>Tahun Ajaran</label>
-                <select name="filter_tahun_ajaran" class="filter-input" onchange="this.form.submit()">
-                    <option value="">Semua Tahun Ajaran</option>
-                    <?php foreach ($tahun_ajaran as $ta): ?>
-                        <option value="<?= $ta['id_tahun_ajaran'] ?>" <?= ($filter_tahun_ajaran == $ta['id_tahun_ajaran']) ? 'selected' : '' ?>>
-                            <?= esc($ta['nama_tahun_ajaran']) ?>
-                        </option>
+<div class="toolbar">
+    <div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input type="text" class="input" id="q" placeholder="Cari nama, NIS, atau nama beasiswa…"></div>
+    <select class="input" id="fTA"><option value="">Semua Tahun Ajaran</option><?php foreach ($tahun_ajaran as $ta): ?><option value="<?= $ta['id_tahun_ajaran'] ?>"><?= esc($ta['nama_tahun_ajaran']) ?></option><?php endforeach; ?></select>
+</div>
+
+<div class="card" style="overflow:hidden;">
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead><tr><th>Siswa</th><th>Beasiswa</th><th>Jenis Tagihan</th><th style="text-align:right;">Nilai</th><th>Status</th><th></th></tr></thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+    <div class="row-list" id="cardList" style="padding:10px;"></div>
+    <div id="emptyState" style="display:none;"></div>
+    <div class="pager" id="pager"></div>
+</div>
+
+<!-- ===================== MODAL: Tambah / Edit ===================== -->
+<div class="overlay" id="bsModal_overlay" onclick="closeModal('bsModal')"></div>
+<div class="modal modal-wide" id="bsModal">
+    <div class="modal-drag"></div>
+    <div class="modal-header"><h3 id="bsModalTitle">Tambah Beasiswa</h3><button type="button" class="modal-close" onclick="closeModal('bsModal')"><i class="fa-solid fa-xmark"></i></button></div>
+    <form id="bsForm" action="<?= base_url('admin/beasiswa/store') ?>" method="POST">
+        <input type="hidden" name="editing_id" id="f_editing_id" value="<?= esc(old('editing_id', '')) ?>">
+        <div class="modal-body">
+
+            <div class="field" id="f_mode_wrap">
+                <label class="required">Mode</label>
+                <div class="segmented">
+                    <label><input type="radio" name="mode_beasiswa" value="single" id="f_mode_single" checked onchange="setBsMode('single')"> Satu Jenis Tagihan</label>
+                    <label><input type="radio" name="mode_beasiswa" value="bulk" id="f_mode_bulk" onchange="setBsMode('bulk')"> Satu Grup Sekaligus</label>
+                </div>
+                <div class="field-hint">"Satu Grup" berguna untuk mis. memberi diskon SPP di semua 12 bulan sekaligus.</div>
+            </div>
+
+            <div class="field">
+                <label class="required">Cari Siswa</label>
+                <div class="search-box" style="position:relative;">
+                    <input type="text" class="input" id="f_siswa_search" placeholder="Ketik NIS atau nama…" autocomplete="off">
+                    <div class="search-results" id="f_siswa_results" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:30; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--shadow-md); max-height:200px; overflow-y:auto;"></div>
+                </div>
+                <input type="hidden" name="id_siswa" id="f_id_siswa" required>
+                <div id="f_selected_siswa" style="margin-top:8px;"></div>
+            </div>
+
+            <div class="field" id="f_jenis_wrap">
+                <label class="required">Jenis Tagihan</label>
+                <select class="input" name="id_jenis_tagihan" id="f_jenis">
+                    <option value="">— Pilih —</option>
+                    <?php foreach ($jenis_tagihan as $jt): ?>
+                        <option value="<?= $jt['id_jenis_tagihan'] ?>"><?= esc($jt['nama_tagihan']) ?><?= $jt['grup_tagihan'] ? ' (' . esc($jt['grup_tagihan']) . ')' : '' ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="filter-group" style="margin-left: auto;">
-                <a href="<?= base_url('admin/beasiswa') ?>" style="color: var(--secondary); font-size: 13px; font-weight: 600; text-decoration: none;">
-                    <i class="fas fa-undo"></i> Reset Filter
-                </a>
+
+            <div class="field" id="f_grup_wrap" style="display:none;">
+                <label class="required">Grup Tagihan</label>
+                <select class="input" name="selected_grup" id="f_grup">
+                    <option value="">— Pilih —</option>
+                    <?php foreach ($jenis_tagihan_grouped as $grup => $items): ?>
+                        <option value="<?= esc($grup) ?>"><?= esc($grup) ?> (<?= count($items) ?> item)</option>
+                    <?php endforeach; ?>
+                </select>
             </div>
+
+            <div class="field-row">
+                <div class="field">
+                    <label class="required">Nama Beasiswa</label>
+                    <input class="input" name="nama_beasiswa" id="f_nama" placeholder="Contoh: Yatim Piatu" value="<?= esc(old('nama_beasiswa', '')) ?>" required>
+                </div>
+                <div class="field">
+                    <label class="required">Tahun Ajaran</label>
+                    <select class="input" name="id_tahun_ajaran" id="f_ta" required>
+                        <option value="">— Pilih —</option>
+                        <?php foreach ($tahun_ajaran as $ta): ?>
+                            <option value="<?= $ta['id_tahun_ajaran'] ?>"><?= esc($ta['nama_tahun_ajaran']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+
+            <div class="field-row">
+                <div class="field">
+                    <label class="required">Tipe Potongan</label>
+                    <div class="segmented">
+                        <label><input type="radio" name="tipe_beasiswa" value="nominal" id="f_tipe_nominal" checked onchange="setBsTipe()"> Rp Nominal</label>
+                        <label><input type="radio" name="tipe_beasiswa" value="persentase" id="f_tipe_persen" onchange="setBsTipe()"> % Persen</label>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="required" id="f_nilai_label">Nilai (Rp)</label>
+                    <input type="number" class="input" name="nilai_beasiswa" id="f_nilai" min="0" step="1" value="<?= esc(old('nilai_beasiswa', '')) ?>" required>
+                </div>
+            </div>
+
+            <div class="field" id="f_status_wrap" style="display:none;">
+                <label class="required">Status</label>
+                <select class="input" name="status" id="f_status">
+                    <option value="aktif">Aktif</option>
+                    <option value="nonaktif">Nonaktif</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <label>Keterangan</label>
+                <textarea class="input" name="keterangan" id="f_ket" rows="2"><?= esc(old('keterangan', '')) ?></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('bsModal')">Batal</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Simpan</button>
         </div>
     </form>
 </div>
 
-<div class="card-table">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h3 style="font-size: 16px; font-weight: 700;">Daftar Siswa Penerima</h3>
-        <input type="text" id="customSearch" class="search-input-client" placeholder="Cari nama, NIS, atau jenis beasiswa...">
-    </div>
-
-    <table id="tableBeasiswa" class="display" style="width:100%">
-        <thead>
-            <tr>
-                <th width="5%">No</th>
-                <th>Siswa</th>
-                <th>Nama Beasiswa</th>
-                <th>Jenis Tagihan</th>
-                <th style="text-align: right;">Nilai</th>
-                <th style="text-align: center;">Status</th>
-                <th width="10%" style="text-align: center;">Aksi</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($beasiswa as $index => $b): ?>
-            <tr>
-                <td class="text-center"><?= $index + 1 ?></td>
-                <td>
-                    <div style="font-weight:700;"><?= esc($b['nama_siswa']) ?></div>
-                    <div style="font-size:11px; color:var(--secondary);">NIS: <?= esc($b['nis']) ?></div>
-                </td>
-                <td>
-                    <div style="font-weight:600; font-size:13px;"><?= esc($b['nama_beasiswa']) ?></div>
-                    <?php if ($b['keterangan']): ?>
-                        <div style="font-size:10px; color:var(--secondary); max-width: 200px;" class="text-truncate">
-                            <?= esc($b['keterangan']) ?>
-                        </div>
-                    <?php endif; ?>
-                </td>
-                <td><span style="font-size: 13px;"><?= esc($b['nama_tagihan']) ?></span></td>
-                <td style="text-align: right;">
-                    <div class="beasiswa-value">
-                        <?= $b['tipe_beasiswa'] === 'nominal' ? 'Rp ' . number_format($b['nilai_beasiswa'], 0, ',', '.') : number_format($b['nilai_beasiswa'], 0, ',', '.') . '%' ?>
-                    </div>
-                </td>
-                <td class="text-center">
-                    <?php if ($b['status'] === 'aktif'): ?>
-                        <span class="badge badge-success">AKTIF</span>
-                    <?php else: ?>
-                        <span class="badge badge-danger">NONAKTIF</span>
-                    <?php endif; ?>
-                </td>
-                <td class="text-center">
-                    <div style="display: flex; gap: 6px; justify-content: center;">
-                        <a href="<?= base_url('admin/beasiswa/edit/' . $b['id_beasiswa']) ?>" class="btn-action btn-warning" title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        <form action="<?= base_url('admin/beasiswa/delete/' . $b['id_beasiswa']) ?>" method="POST" style="display: inline;">
-                            <button type="submit" class="btn-action btn-danger" onclick="return confirm('Hapus beasiswa ini? Tagihan akan dihitung ulang secara otomatis.')">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </form>
-                    </div>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
-</div>
-
 <script>
-    $(document).ready(function() {
-        var table = $('#tableBeasiswa').DataTable({
-            "language": {
-                "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/id.json"
-            },
-            "pageLength": 10,
-            "dom": 'rtip', 
-            "ordering": true,
-            "columnDefs": [
-                { "orderable": false, "targets": 6 }
-            ]
-        });
+const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
+const LIST_URL = '<?= base_url('admin/beasiswa') ?>';
+let page = 1;
+const PER_PAGE = 15;
+let q = '', fTA = '';
+let currentRows = [];
+let fetchToken = 0;
 
-        // Live search logic
-        $('#customSearch').on('keyup', function() {
-            table.search(this.value).draw();
-        });
-    });
+function esc(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
+function fmt(n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+function nilaiFmt(b) { return b.tipe_beasiswa === 'nominal' ? 'Rp ' + fmt(b.nilai_beasiswa) : fmt(b.nilai_beasiswa) + '%'; }
+function statusBadge(s) { return s === 'aktif' ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-danger">Nonaktif</span>'; }
+
+function showSkeleton() {
+    let html = '';
+    for (let i = 0; i < 5; i++) html += '<div class="skeleton-row"><div class="skeleton-bar" style="width:60%;"></div><div class="skeleton-bar" style="width:35%;"></div></div>';
+    document.getElementById('cardList').innerHTML = html;
+    document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" style="padding:0;">' + html + '</td></tr>';
+}
+
+async function loadPage() {
+    const myToken = ++fetchToken;
+    showSkeleton();
+    document.getElementById('emptyState').style.display = 'none';
+    const params = new URLSearchParams({ page, per_page: PER_PAGE });
+    if (q) params.set('keyword', q);
+    if (fTA) params.set('filter_tahun_ajaran', fTA);
+
+    let data;
+    try {
+        const res = await fetch(LIST_URL + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        data = await res.json();
+    } catch (e) { document.getElementById('resultCount').textContent = 'Gagal memuat data.'; return; }
+    if (myToken !== fetchToken) return;
+
+    currentRows = data.rows;
+    document.getElementById('resultCount').textContent = data.total + ' beasiswa';
+
+    const tbody = document.getElementById('tableBody');
+    const cardList = document.getElementById('cardList');
+    const emptyState = document.getElementById('emptyState');
+
+    if (currentRows.length === 0) {
+        tbody.innerHTML = ''; cardList.innerHTML = '';
+        emptyState.style.display = 'block';
+        emptyState.innerHTML = '<div class="empty-state"><i class="fa-solid fa-award"></i><p>Belum ada beasiswa yang cocok.</p></div>';
+    } else {
+        emptyState.style.display = 'none';
+        tbody.innerHTML = currentRows.map(b => `
+            <tr>
+                <td><div style="font-weight:700; color:var(--ink);">${esc(b.nama_siswa)}</div><div style="font-size:11.5px; color:var(--muted);">${esc(b.nis)}</div></td>
+                <td>${esc(b.nama_beasiswa)}</td>
+                <td>${esc(b.nama_tagihan || '-')}</td>
+                <td style="text-align:right; font-weight:700; font-family:'Roboto Mono',monospace;">${nilaiFmt(b)}</td>
+                <td>${statusBadge(b.status)}</td>
+                <td style="text-align:right;">
+                    <button class="icon-action" title="Edit" onclick="openEditModal(${b.id_beasiswa})"><i class="fa-solid fa-pencil"></i></button>
+                    <form method="POST" action="${BASE_URL}/admin/beasiswa/delete/${b.id_beasiswa}" style="display:inline;" onsubmit="return confirm('Hapus beasiswa ' + ${JSON.stringify(b.nama_beasiswa)} + '? Tagihan terkait akan dihitung ulang.')"><button type="submit" class="icon-action danger" title="Hapus"><i class="fa-solid fa-trash"></i></button></form>
+                </td>
+            </tr>`).join('');
+        cardList.innerHTML = currentRows.map(b => `
+            <div class="card bs-card" onclick="openEditModal(${b.id_beasiswa})">
+                <div class="top"><span class="name">${esc(b.nama_siswa)}</span>${statusBadge(b.status)}</div>
+                <div class="meta">${esc(b.nama_beasiswa)} · ${esc(b.nama_tagihan || '-')}</div>
+                <div class="meta" style="margin-top:6px; font-weight:700; color:var(--brand-darker);">${nilaiFmt(b)}</div>
+            </div>`).join('');
+    }
+
+    const pager = document.getElementById('pager');
+    if (data.total_pages > 1) {
+        pager.style.display = 'flex';
+        pager.innerHTML = `<span>Halaman ${data.page} dari ${data.total_pages}</span><div class="btns">
+            <button class="icon-action" ${data.page <= 1 ? 'disabled' : ''} onclick="gotoPage(${data.page - 1})"><i class="fa-solid fa-chevron-left"></i></button>
+            <button class="icon-action" ${data.page >= data.total_pages ? 'disabled' : ''} onclick="gotoPage(${data.page + 1})"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>`;
+    } else { pager.style.display = 'none'; }
+}
+function gotoPage(p) { page = p; loadPage(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+let searchDebounce;
+document.getElementById('q').addEventListener('input', function () { clearTimeout(searchDebounce); searchDebounce = setTimeout(() => { q = this.value.trim(); page = 1; loadPage(); }, 350); });
+document.getElementById('fTA').addEventListener('change', function () { fTA = this.value; page = 1; loadPage(); });
+
+// ===================== MODAL =====================
+function setBsMode(v) {
+    document.getElementById('f_jenis_wrap').style.display = v === 'single' ? 'block' : 'none';
+    document.getElementById('f_grup_wrap').style.display = v === 'bulk' ? 'block' : 'none';
+    document.getElementById('f_jenis').required = v === 'single';
+    document.getElementById('f_grup').required = v === 'bulk';
+}
+function setBsTipe() {
+    const isNominal = document.getElementById('f_tipe_nominal').checked;
+    document.getElementById('f_nilai_label').textContent = isNominal ? 'Nilai (Rp)' : 'Nilai (%)';
+    document.getElementById('f_nilai').max = isNominal ? '' : '100';
+}
+
+function resetForm() {
+    document.getElementById('bsForm').reset();
+    document.getElementById('f_editing_id').value = '';
+    document.getElementById('f_selected_siswa').innerHTML = '';
+    document.getElementById('f_id_siswa').value = '';
+    setBsMode('single');
+    setBsTipe();
+}
+
+function openCreateModal() {
+    resetForm();
+    document.getElementById('bsModalTitle').textContent = 'Tambah Beasiswa';
+    document.getElementById('bsForm').action = BASE_URL + '/admin/beasiswa/store';
+    document.getElementById('f_mode_wrap').style.display = 'block';
+    document.getElementById('f_status_wrap').style.display = 'none';
+    document.getElementById('f_status').removeAttribute('required');
+    openModal('bsModal');
+}
+
+function openEditModal(id) {
+    const b = currentRows.find(x => x.id_beasiswa == id);
+    if (!b) {
+        // Baris ini tidak ada di halaman yang sedang tampil (mis. dari bookmark lama
+        // ke ID yang sekarang ada di halaman lain) -- arahkan untuk cari manual.
+        alert('Data ini ada di halaman lain. Silakan cari nama siswa/beasiswanya lewat kotak pencarian.');
+        return;
+    }
+    resetForm();
+    document.getElementById('f_editing_id').value = id;
+    document.getElementById('bsModalTitle').textContent = 'Edit — ' + b.nama_beasiswa;
+    document.getElementById('bsForm').action = BASE_URL + '/admin/beasiswa/update/' + id;
+
+    // Edit selalu mode "single" -- satu baris yang sudah ada, sembunyikan toggle mode
+    document.getElementById('f_mode_wrap').style.display = 'none';
+    setBsMode('single');
+
+    document.getElementById('f_id_siswa').value = b.id_siswa;
+    document.getElementById('f_selected_siswa').innerHTML = `<div class="selected-siswa-box" style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--brand-bg); border:1.5px solid var(--brand-light); border-radius:var(--r-md); padding:10px 14px;"><div><strong>${esc(b.nama_siswa)}</strong><br><small>NIS ${esc(b.nis)}</small></div></div>`;
+    document.getElementById('f_jenis').value = b.id_jenis_tagihan;
+    document.getElementById('f_nama').value = b.nama_beasiswa;
+    document.getElementById('f_ta').value = b.id_tahun_ajaran;
+    document.getElementById(b.tipe_beasiswa === 'nominal' ? 'f_tipe_nominal' : 'f_tipe_persen').checked = true;
+    setBsTipe();
+    document.getElementById('f_nilai').value = b.nilai_beasiswa;
+    document.getElementById('f_ket').value = b.keterangan || '';
+    document.getElementById('f_status_wrap').style.display = 'block';
+    document.getElementById('f_status').setAttribute('required', 'required');
+    document.getElementById('f_status').value = b.status;
+
+    openModal('bsModal');
+}
+
+let sSearchTimeout;
+document.getElementById('f_siswa_search').addEventListener('input', function () {
+    clearTimeout(sSearchTimeout);
+    const keyword = this.value;
+    if (keyword.length < 2) { document.getElementById('f_siswa_results').style.display = 'none'; return; }
+    sSearchTimeout = setTimeout(() => {
+        fetch(BASE_URL + '/admin/siswa/search?keyword=' + encodeURIComponent(keyword))
+            .then(r => r.json())
+            .then(data => {
+                const results = document.getElementById('f_siswa_results');
+                results.innerHTML = data.length === 0
+                    ? '<div class="search-result-item" style="padding:12px 16px; color:var(--faint);">Tidak ada hasil.</div>'
+                    : data.map(s => `<div class="search-result-item" style="padding:12px 16px; cursor:pointer; border-bottom:1px solid var(--border-soft);" onclick='fSelectSiswa(${JSON.stringify(s)})'><strong>${esc(s.nama_lengkap)}</strong><br><small style="color:var(--muted);">NIS ${esc(s.nis)} · ${esc(s.nama_kelas || 'Belum dikelas')}</small></div>`).join('');
+                results.style.display = 'block';
+            });
+    }, 300);
+});
+function fSelectSiswa(s) {
+    document.getElementById('f_id_siswa').value = s.id_siswa;
+    document.getElementById('f_siswa_search').value = '';
+    document.getElementById('f_siswa_results').style.display = 'none';
+    document.getElementById('f_selected_siswa').innerHTML = `<div class="selected-siswa-box" style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--brand-bg); border:1.5px solid var(--brand-light); border-radius:var(--r-md); padding:10px 14px;"><div><strong>${esc(s.nama_lengkap)}</strong><br><small>NIS ${esc(s.nis)}</small></div><button type="button" class="icon-action danger" onclick="document.getElementById('f_id_siswa').value=''; document.getElementById('f_selected_siswa').innerHTML='';"><i class="fa-solid fa-xmark"></i></button></div>`;
+}
+document.addEventListener('click', function (e) { if (!e.target.closest('.search-box')) document.getElementById('f_siswa_results').style.display = 'none'; });
+
+function handleHash() {
+    const h = location.hash;
+    if (h === '#tambah') openCreateModal();
+    else if (h.startsWith('#edit-')) openEditModal(parseInt(h.replace('#edit-', ''), 10));
+}
+
+loadPage().then(() => { if (location.hash) handleHash(); });
 </script>
 
 <?= $this->include('admin/layouts/footer') ?>

@@ -26,7 +26,8 @@ class JenisTagihanController extends BaseController
             'title' => 'Jenis Tagihan',
             'jenis_tagihan' => $this->jenisTagihanModel->orderBy('grup_tagihan', 'ASC')
                                                        ->orderBy('nama_tagihan', 'ASC')
-                                                       ->findAll()
+                                                       ->findAll(),
+            'errors' => session()->getFlashdata('errors') ?? []
         ];
         
         return view('admin/jenis_tagihan/index', $data);
@@ -34,15 +35,11 @@ class JenisTagihanController extends BaseController
     
     /**
      * Form tambah/edit jenis tagihan
+     * UPDATE: form sudah jadi modal di halaman index, URL lama dialihkan ke sana.
      */
     public function create()
     {
-        $data = [
-            'title' => 'Tambah Jenis Tagihan',
-            'errors' => session()->getFlashdata('errors') ?? []
-        ];
-        
-        return view('admin/jenis_tagihan/form', $data);
+        return redirect()->to(base_url('admin/jenis-tagihan#tambah'));
     }
     
     /**
@@ -87,6 +84,7 @@ class JenisTagihanController extends BaseController
     
     /**
      * Form edit jenis tagihan
+     * UPDATE: form sudah jadi modal di halaman index, URL lama dialihkan ke sana.
      */
     public function edit($id)
     {
@@ -96,13 +94,7 @@ class JenisTagihanController extends BaseController
             return redirect()->to(base_url('admin/jenis-tagihan'))->with('error', 'Jenis tagihan tidak ditemukan');
         }
         
-        $data = [
-            'title' => 'Edit Jenis Tagihan',
-            'jenis_tagihan' => $jenisTagihan,
-            'errors' => session()->getFlashdata('errors') ?? []
-        ];
-        
-        return view('admin/jenis_tagihan/form', $data);
+        return redirect()->to(base_url('admin/jenis-tagihan#edit-' . $id));
     }
     
     /**

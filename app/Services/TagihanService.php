@@ -116,6 +116,12 @@ class TagihanService
                     $nominalPotongan = $this->calculateBeasiswa($siswa['id_siswa'], $skema['id_jenis_tagihan'], $idTahunAjaran, $nominalTagihan);
                     $nominalAkhir = max(0, $nominalTagihan - $nominalPotongan);
                     
+                    // FIX: sebelumnya status_tagihan selalu di-hardcode 'belum_bayar' saat generate,
+                    // padahal kalau beasiswa sudah menanggung 100% (nominal_akhir = 0) seharusnya
+                    // langsung 'lunas' karena tidak ada yang perlu dibayar. Tanpa ini, tagihan yang
+                    // sudah gratis tetap nyangkut sebagai "belum bayar" di laporan tunggakan.
+                    $statusTagihan = $nominalAkhir <= 0 ? 'lunas' : 'belum_bayar';
+                    
                     // Insert tagihan
                     $dataTagihan = [
                         'id_siswa' => $siswa['id_siswa'],
@@ -128,7 +134,7 @@ class TagihanService
                         'nominal_dibayar' => 0,
                         'sisa_tagihan' => $nominalAkhir,
                         'bulan_tagihan' => $skema['bulan_tagihan'],
-                        'status_tagihan' => 'belum_bayar',
+                        'status_tagihan' => $statusTagihan,
                         'keterangan' => $skema['keterangan']
                     ];
                     

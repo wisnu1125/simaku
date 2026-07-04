@@ -24,7 +24,8 @@ class TahunAjaranController extends BaseController
     {
         $data = [
             'title' => 'Tahun Ajaran',
-            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll()
+            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
+            'errors' => session()->getFlashdata('errors') ?? []
         ];
         
         return view('admin/tahun_ajaran/index', $data);
@@ -32,15 +33,11 @@ class TahunAjaranController extends BaseController
     
     /**
      * Form tambah tahun ajaran
+     * UPDATE: form sudah jadi modal di halaman index, URL lama dialihkan ke sana.
      */
     public function create()
     {
-        $data = [
-            'title' => 'Tambah Tahun Ajaran',
-            'errors' => session()->getFlashdata('errors') ?? []
-        ];
-        
-        return view('admin/tahun_ajaran/form', $data);
+        return redirect()->to(base_url('admin/tahun-ajaran#tambah'));
     }
     
     /**
@@ -103,6 +100,7 @@ class TahunAjaranController extends BaseController
     
     /**
      * Form edit tahun ajaran
+     * UPDATE: form sudah jadi modal di halaman index, URL lama dialihkan ke sana.
      */
     public function edit($id)
     {
@@ -112,13 +110,7 @@ class TahunAjaranController extends BaseController
             return redirect()->to(base_url('admin/tahun-ajaran'))->with('error', 'Tahun ajaran tidak ditemukan');
         }
         
-        $data = [
-            'title' => 'Edit Tahun Ajaran',
-            'tahun_ajaran' => $tahunAjaran,
-            'errors' => session()->getFlashdata('errors') ?? []
-        ];
-        
-        return view('admin/tahun_ajaran/form', $data);
+        return redirect()->to(base_url('admin/tahun-ajaran#edit-' . $id));
     }
     
     /**

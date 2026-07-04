@@ -1,378 +1,328 @@
 <?= $this->include('admin/layouts/header') ?>
 
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-
 <style>
-/* ==================== CLEAN BLUISH TEAL THEME ==================== */
-:root {
-    --primary: #0891b2;
-    --primary-hover: #0e7490;
-    --secondary: #64748b;
-    --text-main: #1e293b;
-    --border: #e2e8f0;
-}
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+@media (min-width: 640px) { .stat-grid { gap: 16px; } }
+.stat-card { padding: 14px 16px; }
+@media (min-width: 640px) { .stat-card { padding: 18px 20px; } }
+.stat-card .value { font-size: 14px; font-weight: 900; }
+@media (min-width: 640px) { .stat-card .value { font-size: 18px; } }
+.stat-card .label { font-size: 10.5px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .3px; margin-top: 2px; }
 
-body { 
-    background: #f8fafc; 
-    font-family: 'Inter', sans-serif; 
-    color: var(--text-main);
-}
+.toolbar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+@media (min-width: 900px) { .toolbar { flex-direction: row; } }
+.toolbar .search-wrap { position: relative; flex: 1; }
+.toolbar .search-wrap i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--faint); }
+.toolbar .search-wrap input { padding-left: 38px; }
+.toolbar select { width: 100%; }
+@media (min-width: 900px) { .toolbar select { width: 160px; flex-shrink: 0; } }
 
-/* Page Header */
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.page-title { font-size: 24px; font-weight: 700; color: #0f172a; }
+.bulk-bar { display: none; align-items: center; justify-content: space-between; gap: 10px; background: var(--brand-darker); color: #fff; padding: 12px 18px; border-radius: var(--r-md); margin-bottom: 12px; font-size: 13px; font-weight: 600; }
+.bulk-bar.show { display: flex; }
+.bulk-bar button { background: rgba(255,255,255,.15); color: #fff; border: none; padding: 7px 14px; border-radius: var(--r-sm); font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.bulk-bar button:hover { background: rgba(255,255,255,.25); }
 
-/* Button - Animasi Ringan (Hanya transisi warna) */
-.btn-generate { 
-    padding: 10px 20px; border-radius: 8px; text-decoration: none; 
-    font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; 
-    transition: background 0.2s ease;
-    background: var(--primary); color: white;
-}
-.btn-generate:hover { background: var(--primary-hover); }
+.kwitansi-code, .mono-cell { font-family: 'Roboto Mono', monospace; }
+.pager { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--border-soft); font-size: 12.5px; color: var(--muted); }
+.pager .btns { display: flex; gap: 6px; }
 
-/* Tombol Hapus Terpilih */
-.btn-delete-selected {
-    padding: 10px 20px; border-radius: 8px; border: none;
-    font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;
-    transition: all 0.2s ease;
-    background: #ef4444; color: white; cursor: pointer;
-    opacity: 0.5; pointer-events: none;
-}
-.btn-delete-selected.active {
-    opacity: 1; pointer-events: auto;
-}
-.btn-delete-selected.active:hover {
-    background: #dc2626;
-}
+.tgh-card { padding: 14px; display: flex; align-items: flex-start; gap: 10px; }
+.tgh-card .body { flex: 1; min-width: 0; }
+.tgh-card .name { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.tgh-card .meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.tgh-card .amounts { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12.5px; }
 
-/* Stats Row */
-.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 24px; }
-.stat-box { 
-    background: white; border-radius: 12px; padding: 20px; border: 1px solid var(--border); 
-    transition: border-color 0.2s ease;
-}
-.stat-box:hover { border-color: var(--primary); }
-.stat-value { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
-.stat-label { font-size: 11px; font-weight: 700; color: var(--secondary); text-transform: uppercase; }
-
-/* Filter Card */
-.filter-card { background: white; border-radius: 12px; padding: 20px; border: 1px solid var(--border); margin-bottom: 24px; }
-.filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; align-items: flex-end; }
-.filter-group label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: var(--secondary); }
-.filter-input { 
-    width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; 
-    font-size: 14px; background: #f8fafc; transition: border-color 0.2s;
-}
-.filter-input:focus { outline: none; border-color: var(--primary); background: white; }
-
-/* Table Styles */
-.card-table { background: white; border-radius: 12px; border: 1px solid var(--border); padding: 20px; }
-.dataTables_wrapper .dataTables_filter { display: none; }
-
-table.dataTable thead th { 
-    background: #f1f5f9; color: var(--secondary); font-size: 11px; font-weight: 700; 
-    text-transform: uppercase; padding: 12px !important;
-}
-table.dataTable tbody tr { transition: background 0.15s; }
-table.dataTable tbody tr:hover { background-color: #f0f9ff !important; }
-
-/* Badges */
-.badge { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; }
-.badge-success { background: #dcfce7; color: #15803d; }
-.badge-warning { background: #ffedd5; color: #c2410c; }
-.badge-danger { background: #fee2e2; color: #b91c1c; }
-
-/* Search Box */
-.search-input-client { 
-    width: 300px; padding: 10px 14px; border: 1px solid var(--border); 
-    border-radius: 8px; font-size: 14px; background: #f8fafc; transition: all 0.2s;
-}
-.search-input-client:focus { outline: none; border-color: var(--primary); background: white; width: 320px; }
-
-/* Icon Button */
-.btn-action { width: 30px; height: 30px; border-radius: 6px; color: white; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: opacity 0.2s; }
-.btn-view { background: #3b82f6; }
-.btn-delete { background: #ef4444; }
-.btn-action:hover { opacity: 0.8; }
-
-/* Checkbox Styling */
-input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-    accent-color: var(--primary);
-}
-
-/* Styling teks di dalam tabel agar lebih profesional */
-.text-main-bold {
-    display: block;
-    font-weight: 700;
-    color: #0f172a;
-    font-size: 14px;
-    margin-bottom: 2px;
-}
-
-.text-sub-label {
-    display: block;
-    font-size: 11px;
-    font-weight: 500;
-    color: #64748b;
-    letter-spacing: 0.02em;
-}
-
-.kwitansi-wrapper {
-    display: inline-flex;
-    flex-direction: column;
-}
-
-.nominal-bayar {
-    font-family: 'SF Mono', 'Roboto Mono', monospace;
-    font-weight: 800;
-    color: var(--primary);
-    font-size: 14px;
-}
-
-/* Garis halus pemisah di baris tabel */
-table.dataTable tbody td {
-    border-bottom: 1px solid #f1f5f9 !important;
-    padding: 14px 12px !important;
-}
-
-/* Counter untuk checkbox terpilih */
-.selection-counter {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--secondary);
-    font-weight: 600;
-}
+/* Modal generate */
+.radio-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 560px) { .radio-cards { grid-template-columns: 1fr; } }
+.radio-card { border: 1.5px solid var(--border); border-radius: var(--r-md); padding: 14px 10px; text-align: center; cursor: pointer; transition: .15s; }
+.radio-card:has(input:checked) { border-color: var(--brand); background: var(--brand-bg); }
+.radio-card input { display: none; }
+.radio-card .icon { font-size: 22px; margin-bottom: 6px; }
+.radio-card .label { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.radio-card .desc { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
 </style>
 
-<div class="page-header">
-    <h1 class="page-title">Monitoring Tagihan</h1>
-    <a href="<?= base_url('admin/tagihan/generate') ?>" class="btn-generate">
-        <i class="fas fa-bolt"></i> Generate Tagihan
-    </a>
+<div class="page-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:10px;">
+    <div>
+        <div class="page-title">Tagihan</div>
+        <div class="page-subtitle" id="resultCount">Memuat…</div>
+    </div>
+    <button class="btn btn-primary" onclick="openGenerateModal()"><i class="fa-solid fa-bolt"></i> <span class="hide-xs">Generate</span></button>
 </div>
 
-<?php
-$t_tagihan = 0; $t_bayar = 0; $t_sisa = 0;
-foreach ($tagihan as $t) {
-    $t_tagihan += $t['nominal_akhir'];
-    $t_bayar += $t['nominal_dibayar'];
-    $t_sisa += $t['sisa_tagihan'];
-}
-?>
-
-<div class="stats-row">
-    <div class="stat-box" style="border-left: 4px solid #3b82f6;">
-        <div class="stat-label">Total Piutang</div>
-        <div class="stat-value">Rp <?= number_format($t_tagihan, 0, ',', '.') ?></div>
-    </div>
-    <div class="stat-box" style="border-left: 4px solid #10b981;">
-        <div class="stat-label">Terbayar</div>
-        <div class="stat-value" style="color: #10b981;">Rp <?= number_format($t_bayar, 0, ',', '.') ?></div>
-    </div>
-    <div class="stat-box" style="border-left: 4px solid #ef4444;">
-        <div class="stat-label">Tunggakan</div>
-        <div class="stat-value" style="color: #ef4444;">Rp <?= number_format($t_sisa, 0, ',', '.') ?></div>
-    </div>
+<div class="stat-grid">
+    <div class="card stat-card"><div class="value" id="statJumlah">0</div><div class="label">Jumlah Tagihan</div></div>
+    <div class="card stat-card"><div class="value" id="statNominal">Rp 0</div><div class="label">Total Nominal</div></div>
+    <div class="card stat-card"><div class="value" style="color:var(--danger);" id="statSisa">Rp 0</div><div class="label">Total Tunggakan</div></div>
 </div>
 
-<div class="filter-card">
-    <form method="GET" action="<?= base_url('admin/tagihan') ?>">
-        <div class="filter-grid">
-            <div class="filter-group">
-                <label>TAHUN AJARAN</label>
-                <select name="filter_tahun_ajaran" class="filter-input" onchange="this.form.submit()">
-                    <option value="">Semua Tahun</option>
-                    <?php foreach ($tahun_ajaran as $ta): ?>
-                        <option value="<?= $ta['id_tahun_ajaran'] ?>" <?= ($filter_tahun_ajaran == $ta['id_tahun_ajaran']) ? 'selected' : '' ?>>
-                            <?= esc($ta['nama_tahun_ajaran']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>KELAS</label>
-                <select name="filter_kelas" class="filter-input" onchange="this.form.submit()">
-                    <option value="">Semua Kelas</option>
-                    <?php foreach ($kelas as $k): ?>
-                        <option value="<?= $k['id_kelas'] ?>" <?= ($filter_kelas == $k['id_kelas']) ? 'selected' : '' ?>>
-                            <?= esc($k['nama_kelas']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="filter-group">
-                <a href="<?= base_url('admin/tagihan') ?>" style="color: var(--secondary); font-size: 13px; font-weight: 600; text-decoration: none;">
-                    <i class="fas fa-undo"></i> Reset
-                </a>
-            </div>
-        </div>
-    </form>
+<div class="toolbar">
+    <div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input type="text" class="input" id="q" placeholder="Cari nama atau NIS…"></div>
+    <select class="input" id="fTahunAjaran"><option value="">Semua Tahun Ajaran</option><?php foreach ($tahun_ajaran as $ta): ?><option value="<?= $ta['id_tahun_ajaran'] ?>" <?= $filter_tahun_ajaran == $ta['id_tahun_ajaran'] ? 'selected' : '' ?>><?= esc($ta['nama_tahun_ajaran']) ?></option><?php endforeach; ?></select>
+    <select class="input" id="fKelas"><option value="">Semua Kelas</option><?php foreach ($kelas as $k): ?><option value="<?= $k['id_kelas'] ?>" <?= $filter_kelas == $k['id_kelas'] ? 'selected' : '' ?>><?= esc($k['nama_kelas']) ?></option><?php endforeach; ?></select>
+    <select class="input" id="fStatus"><option value="">Semua Status</option><option value="belum_bayar">Belum Bayar</option><option value="cicil">Cicil</option><option value="lunas">Lunas</option></select>
 </div>
 
-<div class="card-table">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <div style="display: flex; align-items: center; gap: 16px;">
-            <h3 style="font-size: 16px; font-weight: 700;">Daftar Rincian</h3>
-            <button type="button" id="btnDeleteSelected" class="btn-delete-selected">
-                <i class="fas fa-trash"></i> 
-                <span class="selection-counter">Hapus <span id="selectedCount">0</span> Terpilih</span>
-            </button>
-        </div>
-        <input type="text" id="customSearch" class="search-input-client" placeholder="Cari nama atau NIS...">
-    </div>
+<div class="bulk-bar" id="bulkBar">
+    <span><span id="bulkCount">0</span> tagihan terpilih</span>
+    <button type="button" onclick="bulkDelete()"><i class="fa-solid fa-trash"></i> Hapus Terpilih</button>
+</div>
+<form id="formBulkDelete" method="POST" action="<?= base_url('admin/tagihan/bulk-delete') ?>" style="display:none;"></form>
+<form id="formDeleteSingle" method="POST" style="display:none;"></form>
 
-    <form id="formBulkDelete" method="POST" action="<?= base_url('admin/tagihan/bulk-delete') ?>">
-        <?= csrf_field() ?>
-        <table id="tableTagihan" class="display" style="width:100%">
-            <thead>
-                <tr>
-                    <th width="3%"><input type="checkbox" id="selectAll"></th>
-                    <th width="5%">No</th>
-                    <th>Siswa</th>
-                    <th>Tagihan</th>
-                    <th style="text-align: right;">Nominal</th>
-                    <th style="text-align: right;">Sisa</th>
-                    <th style="text-align: center;">Status</th>
-                    <th width="8%" style="text-align: center;">Aksi</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($tagihan as $index => $t): ?>
-                <tr>
-                    <td class="text-center">
-                        <?php if ($t['status_tagihan'] === 'belum_bayar'): ?>
-                            <input type="checkbox" class="checkbox-item" name="id_tagihan[]" value="<?= $t['id_tagihan'] ?>">
-                        <?php endif; ?>
-                    </td>
-                    <td class="text-center"><?= $index + 1 ?></td>
-                    <td>
-                        <div style="font-weight:700;"><?= esc($t['nama_siswa']) ?></div>
-                        <div style="font-size:11px; color:var(--secondary);"><?= esc($t['nis']) ?> • <?= esc($t['nama_kelas']) ?></div>
-                    </td>
-                    <td>
-                        <div style="font-weight:600; font-size:13px;"><?= esc($t['nama_tagihan']) ?></div>
-                        <?php if($t['bulan_tagihan']): ?><span style="font-size:10px; color:var(--secondary);">Bulan <?= $t['bulan_tagihan'] ?></span><?php endif; ?>
-                    </td>
-                    <td style="text-align: right; font-weight: 700;">Rp <?= number_format($t['nominal_akhir'], 0, ',', '.') ?></td>
-                    <td style="text-align: right; font-weight: 700; color: #ef4444;">Rp <?= number_format($t['sisa_tagihan'], 0, ',', '.') ?></td>
-                    <td class="text-center">
-                        <?php if ($t['status_tagihan'] === 'lunas'): ?>
-                            <span class="badge badge-success">LUNAS</span>
-                        <?php elseif ($t['status_tagihan'] === 'cicil'): ?>
-                            <span class="badge badge-warning">CICIL</span>
-                        <?php else: ?>
-                            <span class="badge badge-danger">BELUM</span>
-                        <?php endif; ?>
-                    </td>
-                    <td class="text-center">
-                        <div style="display: flex; gap: 4px; justify-content: center;">
-                            <a href="<?= base_url('admin/tagihan/detail/'.$t['id_siswa']) ?>" class="btn-action btn-view"><i class="fas fa-eye"></i></a>
-                            <?php if ($t['status_tagihan'] === 'belum_bayar'): ?>
-                            <button type="button" class="btn-action btn-delete btn-delete-single" data-id="<?= $t['id_tagihan'] ?>">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
+<div class="card" style="overflow:hidden;">
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead><tr><th style="width:32px;"><input type="checkbox" id="selectAll"></th><th>Siswa</th><th>Tagihan</th><th style="text-align:right;">Nominal</th><th style="text-align:right;">Sisa</th><th>Status</th><th></th></tr></thead>
+            <tbody id="tableBody"></tbody>
         </table>
-    </form>
+    </div>
+    <div class="row-list" id="cardList"></div>
+    <div id="emptyState" style="display:none;"></div>
+    <div class="pager" id="pager"></div>
 </div>
 
-<!-- Form untuk delete single (hidden) -->
-<form id="formDeleteSingle" method="POST" style="display: none;">
-    <?= csrf_field() ?>
-</form>
+<!-- ===================== MODAL: Generate Tagihan ===================== -->
+<div class="overlay" id="genModal_overlay" onclick="closeModal('genModal')"></div>
+<div class="modal" id="genModal">
+    <div class="modal-drag"></div>
+    <div class="modal-header"><h3>Generate Tagihan</h3><button type="button" class="modal-close" onclick="closeModal('genModal')"><i class="fa-solid fa-xmark"></i></button></div>
+    <form id="genForm" action="<?= base_url('admin/tagihan/generate') ?>" method="POST">
+        <div class="modal-body">
+            <div class="hint-box" style="background:var(--warning-bg); border:1px solid var(--warning-border); border-radius:var(--r-md); padding:12px 14px; font-size:12.5px; color:#78350f; margin-bottom:18px; display:flex; gap:10px;">
+                <i class="fa-solid fa-triangle-exclamation" style="margin-top:1px;"></i>
+                <span>Tagihan yang <strong>belum ada pembayaran</strong> pada ruang lingkup terpilih akan dihapus &amp; dibuat ulang. Tagihan yang sudah ada pembayarannya tidak akan tersentuh.</span>
+            </div>
+
+            <div class="field">
+                <label class="required">Tahun Ajaran</label>
+                <select class="input" name="id_tahun_ajaran" id="g_ta" required>
+                    <option value="">— Pilih —</option>
+                    <?php foreach ($tahun_ajaran as $ta): ?>
+                        <option value="<?= $ta['id_tahun_ajaran'] ?>"><?= esc($ta['nama_tahun_ajaran']) ?> <?= $ta['status'] === 'aktif' ? '• Aktif' : '' ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="field">
+                <label class="required">Ruang Lingkup</label>
+                <div class="radio-cards">
+                    <label class="radio-card"><input type="radio" name="tipe_generate" value="semua" checked onchange="setGenScope('semua')"><div class="icon">🌐</div><div class="label">Global</div><div class="desc">Semua siswa aktif</div></label>
+                    <label class="radio-card"><input type="radio" name="tipe_generate" value="kelas" onchange="setGenScope('kelas')"><div class="icon">🏫</div><div class="label">Kelas</div><div class="desc">Satu kelas</div></label>
+                    <label class="radio-card"><input type="radio" name="tipe_generate" value="siswa" onchange="setGenScope('siswa')"><div class="icon">👤</div><div class="label">Personal</div><div class="desc">Satu siswa</div></label>
+                </div>
+            </div>
+
+            <div class="field" id="g_kelas_wrap" style="display:none;">
+                <label class="required">Pilih Kelas</label>
+                <select class="input" name="id_kelas" id="g_kelas">
+                    <option value="">— Pilih —</option>
+                    <?php foreach ($kelas as $k): ?>
+                        <option value="<?= $k['id_kelas'] ?>" data-tahun="<?= $k['id_tahun_ajaran'] ?>"><?= esc($k['nama_kelas']) ?> (<?= esc($k['nama_tahun_ajaran']) ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="field" id="g_siswa_wrap" style="display:none;">
+                <label class="required">Cari Siswa</label>
+                <div class="search-box" style="position:relative;">
+                    <input type="text" class="input" id="g_siswa_search" placeholder="Ketik NIS atau nama…" autocomplete="off">
+                    <div class="search-results" id="g_siswa_results" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:30; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--shadow-md); max-height:200px; overflow-y:auto;"></div>
+                </div>
+                <input type="hidden" name="id_siswa" id="g_id_siswa">
+                <div id="g_selected_siswa" style="margin-top:10px;"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('genModal')">Batal</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-bolt"></i> Jalankan Generate</button>
+        </div>
+    </form>
+</div>
 
 <script>
-$(document).ready(function() {
-    var table = $('#tableTagihan').DataTable({
-        "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/id.json" },
-        "pageLength": 10,
-        "dom": 'rtip', 
-        "ordering": true,
-        "columnDefs": [
-            { "orderable": false, "targets": [0, 7] }
-        ]
-    });
+const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
+const LIST_URL = '<?= base_url('admin/tagihan') ?>';
+let page = 1;
+const PER_PAGE = 20;
+let q = '', fTA = '<?= esc($filter_tahun_ajaran ?? '') ?>', fKelas = '<?= esc($filter_kelas ?? '') ?>', fStatus = '';
+let currentRows = [];
+let selectedIds = new Set();
+let fetchToken = 0;
 
-    // Custom search
-    $('#customSearch').on('keyup', function() {
-        table.search(this.value).draw();
-    });
+function esc(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
+function fmt(n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+function statusBadge(s) {
+    if (s === 'lunas') return '<span class="badge badge-success">Lunas</span>';
+    if (s === 'cicil') return '<span class="badge badge-warning">Cicil</span>';
+    return '<span class="badge badge-danger">Belum Bayar</span>';
+}
 
-    // Fungsi update counter dan button state
-    function updateSelection() {
-        var checkedCount = $('.checkbox-item:checked').length;
-        $('#selectedCount').text(checkedCount);
-        
-        if (checkedCount > 0) {
-            $('#btnDeleteSelected').addClass('active');
-        } else {
-            $('#btnDeleteSelected').removeClass('active');
-        }
+function showSkeleton() {
+    let html = '';
+    for (let i = 0; i < 6; i++) html += '<div class="skeleton-row"><div class="skeleton-bar" style="width:65%;"></div><div class="skeleton-bar" style="width:35%;"></div></div>';
+    document.getElementById('cardList').innerHTML = html;
+    document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" style="padding:0;">' + html + '</td></tr>';
+}
+
+async function loadPage() {
+    const myToken = ++fetchToken;
+    showSkeleton();
+    document.getElementById('emptyState').style.display = 'none';
+
+    const params = new URLSearchParams({ page, per_page: PER_PAGE });
+    if (q) params.set('keyword', q);
+    if (fTA) params.set('filter_tahun_ajaran', fTA);
+    if (fKelas) params.set('filter_kelas', fKelas);
+    if (fStatus) params.set('filter_status', fStatus);
+
+    let data;
+    try {
+        const res = await fetch(LIST_URL + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        data = await res.json();
+    } catch (e) { document.getElementById('resultCount').textContent = 'Gagal memuat data.'; return; }
+    if (myToken !== fetchToken) return;
+
+    currentRows = data.rows;
+    document.getElementById('statJumlah').textContent = data.stats.jumlah;
+    document.getElementById('statNominal').textContent = 'Rp ' + fmt(data.stats.total_nominal);
+    document.getElementById('statSisa').textContent = 'Rp ' + fmt(data.stats.total_sisa);
+    document.getElementById('resultCount').textContent = data.total + ' tagihan';
+
+    const tbody = document.getElementById('tableBody');
+    const cardList = document.getElementById('cardList');
+    const emptyState = document.getElementById('emptyState');
+
+    if (currentRows.length === 0) {
+        tbody.innerHTML = ''; cardList.innerHTML = '';
+        emptyState.style.display = 'block';
+        emptyState.innerHTML = '<div class="empty-state"><i class="fa-solid fa-file-invoice"></i><p>Tidak ada tagihan yang cocok.</p></div>';
+    } else {
+        emptyState.style.display = 'none';
+        tbody.innerHTML = currentRows.map(t => `
+            <tr>
+                <td>${t.status_tagihan === 'belum_bayar' ? `<input type="checkbox" class="row-check" data-id="${t.id_tagihan}" ${selectedIds.has(String(t.id_tagihan)) ? 'checked' : ''} onchange="toggleRow(${t.id_tagihan}, this.checked)">` : ''}</td>
+                <td><div style="font-weight:700; color:var(--ink);">${esc(t.nama_siswa)}</div><div style="font-size:11.5px; color:var(--muted);">${esc(t.nis)} · ${esc(t.nama_kelas || '-')}</div></td>
+                <td><div style="font-weight:600; font-size:13px;">${esc(t.nama_tagihan)}</div>${t.bulan_tagihan ? '<span style="font-size:10.5px; color:var(--muted);">Bulan ' + t.bulan_tagihan + '</span>' : ''}</td>
+                <td class="mono-cell" style="text-align:right; font-weight:700;">Rp ${fmt(t.nominal_akhir)}</td>
+                <td class="mono-cell" style="text-align:right; font-weight:700; color:var(--danger);">Rp ${fmt(t.sisa_tagihan)}</td>
+                <td>${statusBadge(t.status_tagihan)}</td>
+                <td style="text-align:right; white-space:nowrap;">
+                    <a class="icon-action" href="${BASE_URL}/admin/tagihan/detail/${t.id_siswa}" title="Lihat"><i class="fa-solid fa-eye"></i></a>
+                    ${t.status_tagihan === 'belum_bayar' ? `<button class="icon-action danger" title="Hapus" onclick="deleteSingle(${t.id_tagihan}, '${esc(t.nama_tagihan).replace(/'/g, "\\'")}')"><i class="fa-solid fa-trash"></i></button>` : ''}
+                </td>
+            </tr>`).join('');
+
+        cardList.innerHTML = currentRows.map(t => `
+            <div class="card tgh-card">
+                ${t.status_tagihan === 'belum_bayar' ? `<input type="checkbox" class="row-check" data-id="${t.id_tagihan}" ${selectedIds.has(String(t.id_tagihan)) ? 'checked' : ''} onchange="toggleRow(${t.id_tagihan}, this.checked)" style="margin-top:3px; width:18px; height:18px; accent-color:var(--brand);">` : '<div style="width:18px;"></div>'}
+                <div class="body">
+                    <div class="name">${esc(t.nama_siswa)}</div>
+                    <div class="meta">${esc(t.nama_tagihan)}${t.bulan_tagihan ? ' · Bln ' + t.bulan_tagihan : ''} · ${esc(t.nis)}</div>
+                    <div class="amounts"><span>${statusBadge(t.status_tagihan)}</span><span class="mono-cell" style="font-weight:700; color:var(--danger);">Rp ${fmt(t.sisa_tagihan)}</span></div>
+                </div>
+                <a class="icon-action" href="${BASE_URL}/admin/tagihan/detail/${t.id_siswa}"><i class="fa-solid fa-eye"></i></a>
+            </div>`).join('');
     }
 
-    // Select All
-    $('#selectAll').on('change', function() {
-        var isChecked = $(this).prop('checked');
-        
-        // Only check visible checkboxes on current page
-        table.$('.checkbox-item', {"page": "current"}).each(function() {
-            $(this).prop('checked', isChecked);
-        });
-        
-        updateSelection();
-    });
+    document.getElementById('selectAll').checked = false;
+    updateBulkBar();
 
-    // Individual checkbox
-    $(document).on('change', '.checkbox-item', function() {
-        // Update select all state
-        var totalCheckboxes = table.$('.checkbox-item', {"page": "current"}).length;
-        var checkedCheckboxes = table.$('.checkbox-item:checked', {"page": "current"}).length;
-        
-        $('#selectAll').prop('checked', totalCheckboxes === checkedCheckboxes && totalCheckboxes > 0);
-        
-        updateSelection();
-    });
+    const pager = document.getElementById('pager');
+    if (data.total_pages > 1) {
+        pager.style.display = 'flex';
+        pager.innerHTML = `<span>Halaman ${data.page} dari ${data.total_pages}</span><div class="btns">
+            <button class="icon-action" ${data.page <= 1 ? 'disabled' : ''} onclick="gotoPage(${data.page - 1})"><i class="fa-solid fa-chevron-left"></i></button>
+            <button class="icon-action" ${data.page >= data.total_pages ? 'disabled' : ''} onclick="gotoPage(${data.page + 1})"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>`;
+    } else { pager.style.display = 'none'; }
+}
+function gotoPage(p) { page = p; loadPage(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
-    // Reset select all when changing page
-    table.on('page.dt', function() {
-        $('#selectAll').prop('checked', false);
-    });
+let searchDebounce;
+document.getElementById('q').addEventListener('input', function () { clearTimeout(searchDebounce); searchDebounce = setTimeout(() => { q = this.value.trim(); page = 1; loadPage(); }, 350); });
+document.getElementById('fTahunAjaran').addEventListener('change', function () { fTA = this.value; page = 1; loadPage(); });
+document.getElementById('fKelas').addEventListener('change', function () { fKelas = this.value; page = 1; loadPage(); });
+document.getElementById('fStatus').addEventListener('change', function () { fStatus = this.value; page = 1; loadPage(); });
 
-    // Bulk Delete
-    $('#btnDeleteSelected').on('click', function() {
-        if (!$(this).hasClass('active')) return;
-        
-        var checkedCount = $('.checkbox-item:checked').length;
-        
-        if (confirm('Apakah Anda yakin ingin menghapus ' + checkedCount + ' tagihan yang dipilih?')) {
-            $('#formBulkDelete').submit();
-        }
-    });
-
-    // Single Delete
-    $(document).on('click', '.btn-delete-single', function() {
-        var id = $(this).data('id');
-        
-        if (confirm('Apakah Anda yakin ingin menghapus tagihan ini?')) {
-            var form = $('#formDeleteSingle');
-            form.attr('action', '<?= base_url('admin/tagihan/delete/') ?>' + id);
-            form.submit();
-        }
-    });
+// ===================== Bulk select & delete =====================
+function toggleRow(id, checked) {
+    if (checked) selectedIds.add(String(id)); else selectedIds.delete(String(id));
+    updateBulkBar();
+}
+document.getElementById('selectAll').addEventListener('change', function () {
+    document.querySelectorAll('.row-check').forEach(cb => { cb.checked = this.checked; toggleRow(cb.dataset.id, this.checked); });
 });
+function updateBulkBar() {
+    document.getElementById('bulkCount').textContent = selectedIds.size;
+    document.getElementById('bulkBar').classList.toggle('show', selectedIds.size > 0);
+}
+function bulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm('Hapus ' + selectedIds.size + ' tagihan terpilih? Tindakan ini tidak bisa dibatalkan.')) return;
+    const form = document.getElementById('formBulkDelete');
+    form.innerHTML = '';
+    selectedIds.forEach(id => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'id_tagihan[]'; inp.value = id;
+        form.appendChild(inp);
+    });
+    form.submit();
+}
+function deleteSingle(id, nama) {
+    if (!confirm('Hapus tagihan "' + nama + '"?')) return;
+    const form = document.getElementById('formDeleteSingle');
+    form.action = BASE_URL + '/admin/tagihan/delete/' + id;
+    form.submit();
+}
+
+// ===================== Modal: Generate =====================
+function setGenScope(v) {
+    document.getElementById('g_kelas_wrap').style.display = v === 'kelas' ? 'block' : 'none';
+    document.getElementById('g_siswa_wrap').style.display = v === 'siswa' ? 'block' : 'none';
+    document.getElementById('g_kelas').required = v === 'kelas';
+    document.getElementById('g_id_siswa').required = v === 'siswa';
+}
+function openGenerateModal() {
+    document.getElementById('genForm').reset();
+    document.getElementById('g_selected_siswa').innerHTML = '';
+    document.getElementById('g_id_siswa').value = '';
+    setGenScope('semua');
+    openModal('genModal');
+}
+
+let gSearchTimeout;
+document.getElementById('g_siswa_search').addEventListener('input', function () {
+    clearTimeout(gSearchTimeout);
+    const keyword = this.value;
+    if (keyword.length < 2) { document.getElementById('g_siswa_results').style.display = 'none'; return; }
+    gSearchTimeout = setTimeout(() => {
+        fetch(BASE_URL + '/admin/siswa/search?keyword=' + encodeURIComponent(keyword))
+            .then(r => r.json())
+            .then(data => {
+                const results = document.getElementById('g_siswa_results');
+                results.innerHTML = data.length === 0
+                    ? '<div class="search-result-item" style="padding:12px 16px; color:var(--faint);">Tidak ada hasil.</div>'
+                    : data.map(s => `<div class="search-result-item" style="padding:12px 16px; cursor:pointer; border-bottom:1px solid var(--border-soft);" onclick='gSelectSiswa(${JSON.stringify(s)})'><strong>${esc(s.nama_lengkap)}</strong><br><small style="color:var(--muted);">NIS ${esc(s.nis)} · ${esc(s.nama_kelas || 'Belum dikelas')}</small></div>`).join('');
+                results.style.display = 'block';
+            });
+    }, 300);
+});
+function gSelectSiswa(s) {
+    document.getElementById('g_id_siswa').value = s.id_siswa;
+    document.getElementById('g_siswa_search').value = '';
+    document.getElementById('g_siswa_results').style.display = 'none';
+    document.getElementById('g_selected_siswa').innerHTML = `<div class="selected-siswa-box" style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--brand-bg); border:1.5px solid var(--brand-light); border-radius:var(--r-md); padding:12px 14px;"><div><strong>${esc(s.nama_lengkap)}</strong><br><small>NIS ${esc(s.nis)}</small></div><button type="button" class="icon-action danger" onclick="document.getElementById('g_id_siswa').value=''; document.getElementById('g_selected_siswa').innerHTML='';"><i class="fa-solid fa-xmark"></i></button></div>`;
+}
+document.addEventListener('click', function (e) { if (!e.target.closest('#g_siswa_wrap')) document.getElementById('g_siswa_results').style.display = 'none'; });
+
+function handleHash() { if (location.hash === '#generate') openGenerateModal(); }
+
+document.getElementById('fTahunAjaran').value = fTA;
+document.getElementById('fKelas').value = fKelas;
+loadPage();
+if (location.hash) handleHash();
 </script>
 
 <?= $this->include('admin/layouts/footer') ?>

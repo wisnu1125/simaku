@@ -5,16 +5,16 @@
    LAPORAN PER KELAS — Premium Teal Theme
    ============================================================ */
 :root {
-    --primary:       #0891b2;
-    --primary-dark:  #0e7490;
-    --primary-deep:  #164e63;
-    --primary-light: #cffafe;
+    --primary:       #0d9488;
+    --primary-dark:  #0f766e;
+    --primary-deep:  #115e59;
+    --primary-light: #ccfbf1;
     --primary-bg:    #f0fdfa;
-    --amber:         #f59e0b;
-    --green:         #10b981;
-    --green-dark:    #059669;
-    --red:           #ef4444;
-    --red-dark:      #dc2626;
+    --amber:         #d97706;
+    --green:         #16a34a;
+    --green-dark:    #15803d;
+    --red:           #dc2626;
+    --red-dark:      #b91c1c;
     --slate-900:     #0f172a;
     --slate-800:     #1e293b;
     --slate-600:     #475569;
@@ -27,12 +27,12 @@
     --radius-lg:     14px;
     --radius-md:     10px;
     --shadow-sm:     0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-    --shadow-md:     0 4px 16px rgba(8,145,178,.08), 0 2px 6px rgba(0,0,0,.04);
-    --shadow-lg:     0 10px 40px rgba(8,145,178,.12), 0 4px 12px rgba(0,0,0,.06);
+    --shadow-md:     0 4px 16px rgba(13,148,136,.08), 0 2px 6px rgba(0,0,0,.04);
+    --shadow-lg:     0 10px 40px rgba(13,148,136,.12), 0 4px 12px rgba(0,0,0,.06);
 }
 
 * { box-sizing: border-box; }
-body { background: var(--slate-50); font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif; color: var(--slate-800); }
+body { background: var(--slate-50); font-family: 'Roboto', sans-serif; color: var(--slate-800); }
 
 /* ── Page Header ─────────────────────────────────────────── */
 .ph-wrap {
@@ -541,7 +541,7 @@ table tfoot td {
     width: 52px;
 }
 .cell-nis {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Roboto Mono', monospace;
     font-size: 12px;
     font-weight: 600;
     color: var(--slate-600);

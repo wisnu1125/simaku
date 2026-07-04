@@ -34,6 +34,9 @@ class TagihanController extends BaseController
     
     /**
      * List tagihan
+     * UPDATE: pencarian/filter/pagination sekarang lewat AJAX + server-side (sebelumnya
+     * findAll() semua baris yang cocok filter tanpa batas -- dengan 3.274+ baris dan terus
+     * bertambah, itu makin berat. Sekarang server cuma kirim halaman yang sedang dilihat.
      */
     public function index()
     {
@@ -42,57 +45,58 @@ class TagihanController extends BaseController
         $filterStatus = $this->request->getGet('filter_status');
         $keyword = $this->request->getGet('keyword');
 
-        $builder = $this->tagihanModel
-            ->select('tagihan.*, 
-                      siswa.nis, 
-                      siswa.nama_lengkap as nama_siswa,
-                      jenis_tagihan.nama_tagihan,
-                      jenis_tagihan.tipe_tagihan,
-                      tahun_ajaran.nama_tahun_ajaran,
-                      kelas.nama_kelas')
-            ->join('siswa', 'siswa.id_siswa = tagihan.id_siswa', 'left')
-            ->join('jenis_tagihan', 'jenis_tagihan.id_jenis_tagihan = tagihan.id_jenis_tagihan', 'left')
-            ->join('tahun_ajaran', 'tahun_ajaran.id_tahun_ajaran = tagihan.id_tahun_ajaran', 'left')
-            ->join('kelas', 'kelas.id_kelas = tagihan.id_kelas', 'left');
+        $applyFilters = function ($model) use ($filterTahunAjaran, $filterKelas, $filterStatus, $keyword) {
+            if ($filterTahunAjaran) $model->where('tagihan.id_tahun_ajaran', $filterTahunAjaran);
+            if ($filterKelas) $model->where('tagihan.id_kelas', $filterKelas);
+            if ($filterStatus) $model->where('tagihan.status_tagihan', $filterStatus);
+            if ($keyword) {
+                $model->groupStart()->like('siswa.nis', $keyword)->orLike('siswa.nama_lengkap', $keyword)->groupEnd();
+            }
+            return $model;
+        };
 
-        // ================= FILTER SERVER SIDE =================
-        // Filter tetap diperlukan agar browser tidak berat meload semua data histori
-        
-        if ($filterTahunAjaran) {
-            $builder->where('tagihan.id_tahun_ajaran', $filterTahunAjaran);
+        if ($this->request->isAJAX()) {
+            $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
+            $perPage = min(50, max(5, (int) ($this->request->getGet('per_page') ?? 20)));
+
+            $listModel = new TagihanModel();
+            $listModel->select('tagihan.*, siswa.nis, siswa.nama_lengkap as nama_siswa, jenis_tagihan.nama_tagihan,
+                                 jenis_tagihan.tipe_tagihan, tahun_ajaran.nama_tahun_ajaran, kelas.nama_kelas')
+                      ->join('siswa', 'siswa.id_siswa = tagihan.id_siswa', 'left')
+                      ->join('jenis_tagihan', 'jenis_tagihan.id_jenis_tagihan = tagihan.id_jenis_tagihan', 'left')
+                      ->join('tahun_ajaran', 'tahun_ajaran.id_tahun_ajaran = tagihan.id_tahun_ajaran', 'left')
+                      ->join('kelas', 'kelas.id_kelas = tagihan.id_kelas', 'left');
+            $applyFilters($listModel);
+
+            $total = $listModel->countAllResults(false);
+            $rows  = $listModel->orderBy('tahun_ajaran.nama_tahun_ajaran', 'DESC')
+                               ->orderBy('siswa.nama_lengkap', 'ASC')
+                               ->limit($perPage, ($page - 1) * $perPage)
+                               ->findAll();
+
+            // Ringkasan (total nominal & tunggakan) mengikuti filter yang sama, dihitung di DB
+            $statsModel = new TagihanModel();
+            $statsModel->join('siswa', 'siswa.id_siswa = tagihan.id_siswa', 'left');
+            $applyFilters($statsModel);
+            $agg = $statsModel->select('SUM(tagihan.nominal_akhir) as total_nominal, SUM(tagihan.sisa_tagihan) as total_sisa, COUNT(*) as jumlah')->first();
+
+            return $this->response->setJSON([
+                'rows' => $rows,
+                'total' => $total,
+                'page' => $page,
+                'per_page' => $perPage,
+                'total_pages' => (int) max(1, ceil($total / $perPage)),
+                'stats' => [
+                    'total_nominal' => (float) ($agg['total_nominal'] ?? 0),
+                    'total_sisa' => (float) ($agg['total_sisa'] ?? 0),
+                    'jumlah' => (int) ($agg['jumlah'] ?? 0),
+                ],
+            ]);
         }
-
-        if ($filterKelas) {
-            $builder->where('tagihan.id_kelas', $filterKelas);
-        }
-
-        if ($filterStatus) {
-            $builder->where('tagihan.status_tagihan', $filterStatus);
-        }
-
-        if ($keyword) {
-            $builder->groupStart()
-                ->like('siswa.nis', $keyword)
-                ->orLike('siswa.nama_lengkap', $keyword)
-                ->groupEnd();
-        }
-        // ==========================================
-
-        // FIXED: Menggunakan findAll() menggantikan paginate()
-        // Agar DataTables di View bisa mengelola pagination, search, dan sorting secara client-side
-        // serta agar perhitungan Total Tagihan/Tunggakan di View akurat untuk semua data yang difilter.
-        $tagihan = $builder
-            ->orderBy('tahun_ajaran.nama_tahun_ajaran', 'DESC')
-            ->orderBy('siswa.nama_lengkap', 'ASC')
-            ->findAll();
 
         $data = [
             'title' => 'Tagihan',
-            'tagihan' => $tagihan,
-            'pager' => null, // Pager bawaan CI4 dimatikan karena sudah pakai DataTables
-            'tahun_ajaran' => $this->tahunAjaranModel
-                ->orderBy('nama_tahun_ajaran', 'DESC')
-                ->findAll(),
+            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
             'kelas' => $this->kelasModel->getKelasWithTahunAjaran(),
             'filter_tahun_ajaran' => $filterTahunAjaran,
             'filter_kelas' => $filterKelas,
@@ -105,16 +109,11 @@ class TagihanController extends BaseController
     
     /**
      * Halaman generate tagihan
+     * UPDATE: form sudah jadi modal di halaman index, URL lama dialihkan ke sana.
      */
     public function generate()
     {
-        $data = [
-            'title' => 'Generate Tagihan',
-            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
-            'kelas' => $this->kelasModel->getKelasWithTahunAjaran()
-        ];
-        
-        return view('admin/tagihan/generate', $data);
+        return redirect()->to(base_url('admin/tagihan#generate'));
     }
     
     /**

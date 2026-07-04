@@ -32,8 +32,32 @@ class PembayaranController extends BaseController
         $filterStatus = $this->request->getGet('filter_status');
         $filterMetode = $this->request->getGet('filter_metode');
         
-        $builder = $this->pembayaranModel
-                        ->select('pembayaran.*, 
+        $applyFilters = function ($model) use ($keyword, $filterStatus, $filterMetode) {
+            if ($keyword) {
+                $model->groupStart()
+                      ->like('siswa.nis', $keyword)
+                      ->orLike('siswa.nama_lengkap', $keyword)
+                      ->orLike('pembayaran.nomor_kwitansi', $keyword)
+                      ->groupEnd();
+            }
+            if ($filterStatus) {
+                $model->where('pembayaran.status_pembayaran', $filterStatus);
+            }
+            if ($filterMetode) {
+                $model->where('pembayaran.metode_pembayaran', $filterMetode);
+            }
+            return $model;
+        };
+        
+        // Kalau dipanggil lewat AJAX (fetch dari halaman index), balas JSON dengan pagination di server
+        // -- jangan kirim SEMUA riwayat pembayaran sekaligus, karena baris ini terus bertambah tiap hari.
+        if ($this->request->isAJAX()) {
+            $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
+            $perPage = min(50, max(5, (int) ($this->request->getGet('per_page') ?? 15)));
+            
+            // Query baris untuk halaman ini (instance model sendiri)
+            $listModel = new PembayaranModel();
+            $listModel->select('pembayaran.*, 
                                  tagihan.nominal_akhir,
                                  tagihan.sisa_tagihan as sisa_tagihan_sekarang,
                                  siswa.nis,
@@ -41,33 +65,53 @@ class PembayaranController extends BaseController
                                  jenis_tagihan.nama_tagihan,
                                  tahun_ajaran.nama_tahun_ajaran,
                                  users.nama_lengkap as nama_petugas')
-                        ->join('tagihan', 'tagihan.id_tagihan = pembayaran.id_tagihan', 'left')
-                        ->join('siswa', 'siswa.id_siswa = tagihan.id_siswa', 'left')
-                        ->join('jenis_tagihan', 'jenis_tagihan.id_jenis_tagihan = tagihan.id_jenis_tagihan', 'left')
-                        ->join('tahun_ajaran', 'tahun_ajaran.id_tahun_ajaran = tagihan.id_tahun_ajaran', 'left')
-                        ->join('users', 'users.id_user = pembayaran.id_user', 'left');
-        
-        if ($keyword) {
-            $builder->groupStart()
-                    ->like('siswa.nis', $keyword)
-                    ->orLike('siswa.nama_lengkap', $keyword)
-                    ->orLike('pembayaran.nomor_kwitansi', $keyword)
-                    ->groupEnd();
+                      ->join('tagihan', 'tagihan.id_tagihan = pembayaran.id_tagihan', 'left')
+                      ->join('siswa', 'siswa.id_siswa = tagihan.id_siswa', 'left')
+                      ->join('jenis_tagihan', 'jenis_tagihan.id_jenis_tagihan = tagihan.id_jenis_tagihan', 'left')
+                      ->join('tahun_ajaran', 'tahun_ajaran.id_tahun_ajaran = tagihan.id_tahun_ajaran', 'left')
+                      ->join('users', 'users.id_user = pembayaran.id_user', 'left');
+            $applyFilters($listModel);
+            
+            // false = jangan reset query builder, supaya where/join di atas masih kepakai buat limit() di bawah
+            $total = $listModel->countAllResults(false);
+            $rows  = $listModel->orderBy('pembayaran.tanggal_bayar', 'DESC')
+                               ->limit($perPage, ($page - 1) * $perPage)
+                               ->findAll();
+            
+            // Statistik mengikuti filter yang sama, tapi lewat query terpisah & independen
+            // (bukan numpang di $listModel yang sudah kepakai limit/count di atas), dan
+            // dihitung SUM/COUNT langsung di database (bukan fetch semua baris ke PHP).
+            $statsModel = new PembayaranModel();
+            $statsModel->join('tagihan', 'tagihan.id_tagihan = pembayaran.id_tagihan', 'left')
+                       ->join('siswa', 'siswa.id_siswa = tagihan.id_siswa', 'left');
+            $applyFilters($statsModel);
+            $statsRows = $statsModel
+                ->select('pembayaran.status_pembayaran, SUM(pembayaran.nominal_bayar) as total, COUNT(*) as jumlah')
+                ->groupBy('pembayaran.status_pembayaran')
+                ->findAll();
+            
+            $totalValid = 0; $countValid = 0; $totalBatal = 0;
+            foreach ($statsRows as $r) {
+                if ($r['status_pembayaran'] === 'valid') { $totalValid = (float) $r['total']; $countValid = (int) $r['jumlah']; }
+                else { $totalBatal += (float) $r['total']; }
+            }
+            
+            return $this->response->setJSON([
+                'rows'        => $rows,
+                'total'       => $total,
+                'page'        => $page,
+                'per_page'    => $perPage,
+                'total_pages' => (int) max(1, ceil($total / $perPage)),
+                'stats'       => [
+                    'total_valid' => $totalValid,
+                    'count_valid' => $countValid,
+                    'total_batal' => $totalBatal,
+                ],
+            ]);
         }
-        
-        if ($filterStatus) {
-            $builder->where('pembayaran.status_pembayaran', $filterStatus);
-        }
-        
-        if ($filterMetode) {
-            $builder->where('pembayaran.metode_pembayaran', $filterMetode);
-        }
-        
-        $pembayaran = $builder->orderBy('pembayaran.tanggal_bayar', 'DESC')->findAll();
         
         $data = [
             'title' => 'Pembayaran',
-            'pembayaran' => $pembayaran,
             'keyword' => $keyword,
             'filter_status' => $filterStatus,
             'filter_metode' => $filterMetode
@@ -77,16 +121,16 @@ class PembayaranController extends BaseController
     }
     
     /**
-     * Form input pembayaran
+     * Form input pembayaran.
+     * UPDATE: form sudah jadi modal di halaman index (sama seperti Siswa), jadi URL lama
+     * ini tinggal dialihkan supaya bookmark/tautan lama (termasuk tombol "Bayar" dari
+     * drawer Siswa & shortcut Dashboard) tetap jalan dan modalnya otomatis terbuka.
      */
     public function create()
     {
-        $data = [
-            'title' => 'Input Pembayaran',
-            'errors' => session()->getFlashdata('errors') ?? []
-        ];
-        
-        return view('admin/pembayaran/form', $data);
+        $idSiswa = $this->request->getGet('id_siswa');
+        $hash = $idSiswa ? '#bayar-' . (int) $idSiswa : '#bayar';
+        return redirect()->to(base_url('admin/pembayaran' . $hash));
     }
     
     /**

@@ -1,229 +1,170 @@
 <?= $this->include('admin/layouts/header') ?>
 
 <style>
-/* ==================== CLEAN PRO-STYLE THEME ==================== */
-:root {
-    --primary: #0891b2;
-    --primary-hover: #0e7490;
-    --secondary: #64748b;
-    --text-main: #1e293b;
-    --border: #e2e8f0;
-}
+.filter-row { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+@media (min-width: 640px) { .filter-row { flex-direction: row; } }
+.filter-row select { width: 100%; }
+@media (min-width: 640px) { .filter-row select { width: 260px; } }
 
-body { 
-    background: #f8fafc; 
-    font-family: 'Inter', sans-serif; 
-    color: var(--text-main);
-}
+.kelas-info { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 20px; background: var(--brand-bg); border: 1px solid var(--brand-light); border-radius: var(--r-md); margin-bottom: 16px; flex-wrap: wrap; }
+.kelas-info .name { font-size: 15px; font-weight: 800; color: var(--brand-darker); }
+.kelas-info .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
-.page-header { margin-bottom: 24px; }
-.page-title { font-size: 24px; font-weight: 700; color: #0f172a; }
+.siswa-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border-soft); }
+.siswa-row:last-child { border-bottom: none; }
+.siswa-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--brand); flex-shrink: 0; }
+.siswa-row .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--border-soft); color: var(--muted); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12.5px; flex-shrink: 0; }
+.siswa-row .name { font-size: 13px; font-weight: 700; color: var(--ink); }
+.siswa-row .meta { font-size: 11.5px; color: var(--muted); }
 
-/* Info Box */
-.info-box {
-    background: #eff6ff;
-    border: 1px solid #dbeafe;
-    color: #1e40af;
-    padding: 16px;
-    border-radius: 12px;
-    margin-bottom: 24px;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-/* Filter Card */
-.filter-card { 
-    background: white; 
-    border-radius: 14px; 
-    padding: 24px; 
-    border: 1px solid var(--border); 
-    margin-bottom: 24px;
-    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
-}
-
-.filter-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 16px;
-    margin-bottom: 16px;
-}
-
-.filter-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--secondary);
-    text-transform: uppercase;
-}
-
-.filter-input { 
-    width: 100%; 
-    padding: 12px; 
-    border: 1.5px solid var(--border); 
-    border-radius: 10px; 
-    font-size: 14px; 
-    background: #f8fafc;
-    transition: all 0.2s;
-}
-
-.filter-input:focus { outline: none; border-color: var(--primary); background: white; }
-
-/* Kelas Header Card */
-.kelas-header {
-    background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
-    color: white;
-    padding: 24px;
-    border-radius: 14px;
-    margin-bottom: 24px;
-    box-shadow: 0 10px 15px -3px rgba(8, 145, 178, 0.2);
-}
-
-.kelas-title { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
-.kelas-subtitle { font-size: 13px; opacity: 0.85; font-weight: 500; }
-
-/* Student Table Styles */
-.card-table { background: white; border-radius: 14px; border: 1px solid var(--border); padding: 24px; }
-table { width: 100%; border-collapse: collapse; }
-table thead th { 
-    background: #f1f5f9; 
-    color: var(--secondary); 
-    font-size: 11px; 
-    font-weight: 700; 
-    text-transform: uppercase; 
-    padding: 14px !important;
-}
-table tbody td { padding: 16px 14px !important; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-
-.text-main-bold { display: block; font-weight: 700; color: #0f172a; font-size: 14px; }
-.text-sub-label { display: block; font-size: 11px; font-weight: 500; color: var(--secondary); }
-
-/* Buttons */
-.btn { 
-    padding: 12px 24px; 
-    border-radius: 10px; 
-    font-size: 14px; 
-    font-weight: 700; 
-    display: inline-flex; 
-    align-items: center; 
-    gap: 8px; 
-    transition: all 0.2s;
-    text-decoration: none;
-    cursor: pointer;
-}
-
-.btn-primary { background: var(--primary); color: white; border: none; }
-.btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
-.btn-warning { background: #f59e0b; color: white; border: none; }
-.btn-warning:hover { background: #d97706; transform: translateY(-1px); }
-
-.action-buttons {
-    display: flex;
-    gap: 12px;
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 2px dashed var(--border);
-}
-
-.badge-active {
-    background: #dcfce7;
-    color: #15803d;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 10px;
-    font-weight: 700;
-}
+.action-bar { position: sticky; bottom: 16px; margin-top: 16px; background: var(--ink); color: #fff; padding: 14px 18px; border-radius: var(--r-lg); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; box-shadow: var(--shadow-lg); }
+.action-bar .count { font-size: 13px; font-weight: 700; }
+.action-bar .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.action-bar .btn-white { background: #fff; color: var(--ink); }
+.action-bar .btn-white:hover { background: var(--border-soft); }
+.action-bar .btn-outline { background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,.3); }
+.action-bar .btn-outline:hover { background: rgba(255,255,255,.1); }
 </style>
 
-<div class="page-header">
-    <h1 class="page-title">Kenaikan & Kelulusan</h1>
-</div>
+<div class="page-title" style="margin-bottom:4px;">Kenaikan Kelas</div>
+<div class="page-subtitle" style="margin-bottom:18px;">Pilih kelas untuk naikkan atau luluskan siswanya sekaligus.</div>
 
-<div class="info-box">
-    <i class="fas fa-info-circle" style="font-size: 18px;"></i>
-    <span>Pilih kelas asal untuk memproses pemindahan siswa ke tingkat selanjutnya atau menandai kelulusan.</span>
-</div>
+<form method="GET" class="filter-row" id="filterForm">
+    <select class="input" name="id_tahun_ajaran" onchange="this.form.submit()">
+        <option value="">Semua Tahun Ajaran</option>
+        <?php foreach ($tahun_ajaran as $ta): ?>
+            <option value="<?= $ta['id_tahun_ajaran'] ?>" <?= $id_tahun_ajaran == $ta['id_tahun_ajaran'] ? 'selected' : '' ?>><?= esc($ta['nama_tahun_ajaran']) ?></option>
+        <?php endforeach; ?>
+    </select>
+    <select class="input" name="id_kelas" onchange="this.form.submit()">
+        <option value="">— Pilih Kelas —</option>
+        <?php foreach ($kelas as $k): ?>
+            <?php if (!$id_tahun_ajaran || $k['id_tahun_ajaran'] == $id_tahun_ajaran): ?>
+            <option value="<?= $k['id_kelas'] ?>" <?= $id_kelas == $k['id_kelas'] ? 'selected' : '' ?>><?= esc($k['nama_kelas']) ?> (<?= esc($k['nama_tahun_ajaran'] ?? '-') ?>)</option>
+            <?php endif; ?>
+        <?php endforeach; ?>
+    </select>
+</form>
 
-<div class="filter-card">
-    <form action="<?= base_url('admin/kenaikan-kelas') ?>" method="GET">
-        <div class="filter-grid">
-            <div class="filter-group">
-                <label>Pilih Kelas Sumber</label>
-                <select name="id_kelas" class="filter-input" required onchange="this.form.submit()">
-                    <option value="">-- Pilih Kelas --</option>
+<?php if (!empty($kelas_detail)): ?>
+
+    <div class="kelas-info">
+        <div>
+            <div class="name"><i class="fa-solid fa-chalkboard"></i> <?= esc($kelas_detail['nama_kelas']) ?></div>
+            <div class="sub"><?= esc($kelas_detail['nama_tahun_ajaran']) ?> · <?= count($siswa) ?> siswa aktif</div>
+        </div>
+    </div>
+
+    <?php if (empty($siswa)): ?>
+        <div class="card empty-state"><i class="fa-solid fa-user-slash"></i><p>Tidak ada siswa aktif di kelas ini.</p></div>
+    <?php else: ?>
+        <div class="card" style="overflow:hidden;">
+            <div class="siswa-row" style="background:var(--border-soft); font-size:12.5px; font-weight:700; color:var(--muted);">
+                <input type="checkbox" id="selectAll" onchange="document.querySelectorAll('.siswa-check').forEach(cb=>{cb.checked=this.checked}); updateActionBar();">
+                <span>PILIH SEMUA</span>
+            </div>
+            <?php foreach ($siswa as $s): ?>
+            <div class="siswa-row">
+                <input type="checkbox" class="siswa-check" value="<?= $s['id_siswa'] ?>" onchange="updateActionBar()">
+                <div class="avatar"><?= esc(strtoupper(substr($s['nama_lengkap'], 0, 1))) ?></div>
+                <div>
+                    <div class="name"><?= esc($s['nama_lengkap']) ?></div>
+                    <div class="meta">NIS <?= esc($s['nis']) ?> · <?= $s['jenis_kelamin'] === 'L' ? 'Laki-laki' : 'Perempuan' ?></div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="action-bar" id="actionBar" style="display:none;">
+            <span class="count"><span id="selectedCount">0</span> siswa dipilih</span>
+            <div class="btns">
+                <button type="button" class="btn btn-white" onclick="openNaikModal()"><i class="fa-solid fa-arrow-up-right-dots"></i> Naikkan Kelas</button>
+                <button type="button" class="btn btn-outline" onclick="openLulusModal()"><i class="fa-solid fa-graduation-cap"></i> Luluskan</button>
+            </div>
+        </div>
+    <?php endif; ?>
+<?php else: ?>
+    <div class="card empty-state"><i class="fa-solid fa-hand-pointer"></i><p>Pilih kelas di atas untuk mulai memproses kenaikan kelas atau kelulusan.</p></div>
+<?php endif; ?>
+
+<!-- ===================== MODAL: Naik Kelas ===================== -->
+<div class="overlay" id="naikModal_overlay" onclick="closeModal('naikModal')"></div>
+<div class="modal" id="naikModal">
+    <div class="modal-drag"></div>
+    <div class="modal-header"><h3>Naikkan Kelas</h3><button type="button" class="modal-close" onclick="closeModal('naikModal')"><i class="fa-solid fa-xmark"></i></button></div>
+    <form action="<?= base_url('admin/kenaikan-kelas/proses') ?>" method="POST" id="formNaik">
+        <input type="hidden" name="id_kelas_asal" value="<?= $kelas_detail['id_kelas'] ?? '' ?>">
+        <div id="naikSiswaIds"></div>
+        <div class="modal-body">
+            <p style="font-size:13px; color:var(--body); margin-bottom:16px;"><strong id="naikCount">0</strong> siswa akan dipindahkan dari <strong><?= esc($kelas_detail['nama_kelas'] ?? '') ?></strong> ke kelas tujuan berikut:</p>
+            <div class="field">
+                <label class="required">Kelas Tujuan</label>
+                <select class="input" name="id_kelas_tujuan" required>
+                    <option value="">— Pilih —</option>
                     <?php foreach ($kelas as $k): ?>
-                        <option value="<?= $k['id_kelas'] ?>" <?= ($id_kelas == $k['id_kelas']) ? 'selected' : '' ?>>
-                            <?= esc($k['nama_kelas']) ?> (<?= esc($k['nama_tahun_ajaran']) ?>)
-                        </option>
+                        <?php if (empty($kelas_detail) || $k['id_kelas'] != $kelas_detail['id_kelas']): ?>
+                        <option value="<?= $k['id_kelas'] ?>"><?= esc($k['nama_kelas']) ?> (<?= esc($k['nama_tahun_ajaran'] ?? '-') ?>)</option>
+                        <?php endif; ?>
                     <?php endforeach; ?>
                 </select>
             </div>
         </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('naikModal')">Batal</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Proses Kenaikan Kelas</button>
+        </div>
     </form>
 </div>
 
-<?php if (isset($kelas_detail) && isset($siswa)): ?>
-    <div class="kelas-header">
-        <div class="kelas-title"><i class="fas fa-door-open"></i> <?= esc($kelas_detail['nama_kelas']) ?></div>
-        <div class="kelas-subtitle">
-            Tahun Ajaran Aktif: <?= esc($kelas_detail['nama_tahun_ajaran']) ?> &nbsp;•&nbsp; 
-            Kapasitas Terisi: <?= count($siswa) ?> Siswa
+<!-- ===================== MODAL: Kelulusan ===================== -->
+<div class="overlay" id="lulusModal_overlay" onclick="closeModal('lulusModal')"></div>
+<div class="modal" id="lulusModal">
+    <div class="modal-drag"></div>
+    <div class="modal-header"><h3>Luluskan Siswa</h3><button type="button" class="modal-close" onclick="closeModal('lulusModal')"><i class="fa-solid fa-xmark"></i></button></div>
+    <form action="<?= base_url('admin/kenaikan-kelas/proses-kelulusan') ?>" method="POST" id="formLulus">
+        <input type="hidden" name="id_kelas" value="<?= $kelas_detail['id_kelas'] ?? '' ?>">
+        <div id="lulusSiswaIds"></div>
+        <div class="modal-body">
+            <div class="hint-box" style="background:var(--warning-bg); border:1px solid var(--warning-border); border-radius:var(--r-md); padding:12px 14px; font-size:12.5px; color:#78350f; display:flex; gap:10px;">
+                <i class="fa-solid fa-triangle-exclamation" style="margin-top:1px;"></i>
+                <span><strong id="lulusCount">0</strong> siswa akan ditandai <strong>lulus</strong> dan dikeluarkan dari kelas <strong><?= esc($kelas_detail['nama_kelas'] ?? '') ?></strong>. Tindakan ini tidak membatalkan tagihan yang sudah ada.</span>
+            </div>
         </div>
-    </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('lulusModal')">Batal</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-graduation-cap"></i> Proses Kelulusan</button>
+        </div>
+    </form>
+</div>
 
-    <div class="card-table">
-        <?php if (empty($siswa)): ?>
-            <div style="text-align: center; padding: 40px; color: var(--secondary);">
-                <i class="fas fa-users-slash" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px;"></i>
-                <h3 style="font-size: 16px; font-weight: 700;">Kelas Kosong</h3>
-                <p style="font-size: 13px;">Tidak ada data siswa aktif di dalam kelas ini.</p>
-            </div>
-        <?php else: ?>
-            <div style="margin-bottom: 20px;">
-                <h3 style="font-size: 15px; font-weight: 700; color: #0f172a;">Daftar Siswa Kelas Asal</h3>
-            </div>
-            <div class="table-responsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th width="50">No</th>
-                            <th>Biodata Siswa</th>
-                            <th>L/P</th>
-                            <th style="text-align: center;">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($siswa as $index => $s): ?>
-                        <tr>
-                            <td style="color: #cbd5e1; font-weight: 600;"><?= $index + 1 ?></td>
-                            <td>
-                                <span class="text-main-bold"><?= esc($s['nama_lengkap']) ?></span>
-                                <span class="text-sub-label">NIS: <?= esc($s['nis']) ?></span>
-                            </td>
-                            <td>
-                                <span style="font-weight: 600; color: #475569;"><?= $s['jenis_kelamin'] ?></span>
-                            </td>
-                            <td style="text-align: center;">
-                                <span class="badge-active">AKTIF</span>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="action-buttons">
-                <a href="<?= base_url('admin/kenaikan-kelas/form?id_kelas=' . $id_kelas) ?>" class="btn btn-primary">
-                    <i class="fas fa-level-up-alt"></i> Proses Kenaikan Kelas
-                </a>
-                <a href="<?= base_url('admin/kenaikan-kelas/kelulusan?id_kelas=' . $id_kelas) ?>" class="btn btn-warning">
-                    <i class="fas fa-graduation-cap"></i> Proses Kelulusan Siswa
-                </a>
-            </div>
-        <?php endif; ?>
-    </div>
-<?php endif; ?>
+<script>
+function updateActionBar() {
+    const checked = document.querySelectorAll('.siswa-check:checked');
+    document.getElementById('actionBar').style.display = checked.length > 0 ? 'flex' : 'none';
+    document.getElementById('selectedCount').textContent = checked.length;
+}
+
+function getSelectedIds() { return Array.from(document.querySelectorAll('.siswa-check:checked')).map(cb => cb.value); }
+
+function buildHiddenInputs(containerId, ids) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = ids.map(id => `<input type="hidden" name="siswa_ids[]" value="${id}">`).join('');
+}
+
+function openNaikModal() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    document.getElementById('naikCount').textContent = ids.length;
+    buildHiddenInputs('naikSiswaIds', ids);
+    openModal('naikModal');
+}
+function openLulusModal() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    document.getElementById('lulusCount').textContent = ids.length;
+    buildHiddenInputs('lulusSiswaIds', ids);
+    openModal('lulusModal');
+}
+</script>
 
 <?= $this->include('admin/layouts/footer') ?>

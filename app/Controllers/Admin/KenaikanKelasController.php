@@ -62,42 +62,13 @@ class KenaikanKelasController extends BaseController
     
     /**
      * Form kenaikan kelas
+     * UPDATE: checklist siswa + aksi naik kelas sekarang jadi satu halaman dengan index
+     * (modal), jadi URL lama ini dialihkan ke sana dengan kelas yang sama tetap terpilih.
      */
     public function form()
     {
         $idKelas = $this->request->getGet('id_kelas');
-        
-        if (!$idKelas) {
-            return redirect()->to(base_url('admin/kenaikan-kelas'))->with('error', 'Pilih kelas terlebih dahulu');
-        }
-        
-        $kelas = $this->kelasModel
-                      ->select('kelas.*, tahun_ajaran.nama_tahun_ajaran')
-                      ->join('tahun_ajaran', 'tahun_ajaran.id_tahun_ajaran = kelas.id_tahun_ajaran', 'left')
-                      ->where('kelas.id_kelas', $idKelas)
-                      ->first();
-        
-        if (!$kelas) {
-            return redirect()->to(base_url('admin/kenaikan-kelas'))->with('error', 'Kelas tidak ditemukan');
-        }
-        
-        $siswa = $this->siswaModel
-                      ->where('id_kelas', $idKelas)
-                      ->where('status_siswa', 'aktif')
-                      ->orderBy('nama_lengkap', 'ASC')
-                      ->findAll();
-        
-        // Get kelas tujuan (tahun ajaran berikutnya)
-        $kelasTujuan = $this->kelasModel->getKelasWithTahunAjaran();
-        
-        $data = [
-            'title' => 'Kenaikan Kelas',
-            'kelas' => $kelas,
-            'siswa' => $siswa,
-            'kelas_tujuan' => $kelasTujuan
-        ];
-        
-        return view('admin/kenaikan_kelas/form', $data);
+        return redirect()->to(base_url('admin/kenaikan-kelas' . ($idKelas ? '?id_kelas=' . $idKelas . '#naik' : '')));
     }
     
     /**
@@ -167,38 +138,13 @@ class KenaikanKelasController extends BaseController
     
     /**
      * Kelulusan siswa (pindah ke status lulus)
+     * UPDATE: checklist siswa + aksi kelulusan sekarang jadi satu halaman dengan index
+     * (modal), jadi URL lama ini dialihkan ke sana.
      */
     public function kelulusan()
     {
         $idKelas = $this->request->getGet('id_kelas');
-        
-        if (!$idKelas) {
-            return redirect()->to(base_url('admin/kenaikan-kelas'))->with('error', 'Pilih kelas terlebih dahulu');
-        }
-        
-        $kelas = $this->kelasModel
-                      ->select('kelas.*, tahun_ajaran.nama_tahun_ajaran')
-                      ->join('tahun_ajaran', 'tahun_ajaran.id_tahun_ajaran = kelas.id_tahun_ajaran', 'left')
-                      ->where('kelas.id_kelas', $idKelas)
-                      ->first();
-        
-        if (!$kelas) {
-            return redirect()->to(base_url('admin/kenaikan-kelas'))->with('error', 'Kelas tidak ditemukan');
-        }
-        
-        $siswa = $this->siswaModel
-                      ->where('id_kelas', $idKelas)
-                      ->where('status_siswa', 'aktif')
-                      ->orderBy('nama_lengkap', 'ASC')
-                      ->findAll();
-        
-        $data = [
-            'title' => 'Kelulusan Siswa',
-            'kelas' => $kelas,
-            'siswa' => $siswa
-        ];
-        
-        return view('admin/kenaikan_kelas/kelulusan', $data);
+        return redirect()->to(base_url('admin/kenaikan-kelas' . ($idKelas ? '?id_kelas=' . $idKelas . '#lulus' : '')));
     }
     
     /**
