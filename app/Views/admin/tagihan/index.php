@@ -84,12 +84,10 @@
 </div>
 
 <!-- ===================== MODAL: Generate Tagihan ===================== -->
-<div class="overlay" id="genModal_overlay" onclick="closeModal('genModal')"></div>
-<div class="modal" id="genModal">
-    <div class="modal-drag"></div>
-    <div class="modal-header"><h3>Generate Tagihan</h3><button type="button" class="modal-close" onclick="closeModal('genModal')"><i class="fa-solid fa-xmark"></i></button></div>
+<div class="inline-panel" id="genPanel">
+    <div class="inline-panel-header"><h3>Generate Tagihan</h3><button type="button" class="inline-panel-close" onclick="closePanel('genPanel')"><i class="fa-solid fa-xmark"></i></button></div>
     <form id="genForm" action="<?= base_url('admin/tagihan/generate') ?>" method="POST">
-        <div class="modal-body">
+        <div class="inline-panel-body">
             <div class="hint-box" style="background:var(--warning-bg); border:1px solid var(--warning-border); border-radius:var(--r-md); padding:12px 14px; font-size:12.5px; color:#78350f; margin-bottom:18px; display:flex; gap:10px;">
                 <i class="fa-solid fa-triangle-exclamation" style="margin-top:1px;"></i>
                 <span>Tagihan yang <strong>belum ada pembayaran</strong> pada ruang lingkup terpilih akan dihapus &amp; dibuat ulang. Tagihan yang sudah ada pembayarannya tidak akan tersentuh.</span>
@@ -126,16 +124,16 @@
 
             <div class="field" id="g_siswa_wrap" style="display:none;">
                 <label class="required">Cari Siswa</label>
-                <div class="search-box" style="position:relative;">
+                <div class="search-box">
                     <input type="text" class="input" id="g_siswa_search" placeholder="Ketik NIS atau nama…" autocomplete="off">
-                    <div class="search-results" id="g_siswa_results" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:30; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--shadow-md); max-height:200px; overflow-y:auto;"></div>
+                    <div class="search-results" id="g_siswa_results"></div>
                 </div>
                 <input type="hidden" name="id_siswa" id="g_id_siswa">
                 <div id="g_selected_siswa" style="margin-top:10px;"></div>
             </div>
         </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('genModal')">Batal</button>
+        <div class="inline-panel-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePanel('genPanel')">Batal</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-bolt"></i> Jalankan Generate</button>
         </div>
     </form>
@@ -289,33 +287,54 @@ function openGenerateModal() {
     document.getElementById('g_selected_siswa').innerHTML = '';
     document.getElementById('g_id_siswa').value = '';
     setGenScope('semua');
-    openModal('genModal');
+    openPanel('genPanel');
+}
+
+if (typeof openSearchDropdown !== 'function') {
+    window.openSearchDropdown = function (inputEl, dropdownEl, html) {
+        dropdownEl.innerHTML = html;
+        const rect = inputEl.getBoundingClientRect();
+        dropdownEl.style.position = 'fixed';
+        dropdownEl.style.left = rect.left + 'px';
+        dropdownEl.style.right = 'auto';
+        dropdownEl.style.top = (rect.bottom + 6) + 'px';
+        dropdownEl.style.width = rect.width + 'px';
+        dropdownEl.style.margin = '0';
+        dropdownEl.style.display = 'block';
+    };
+}
+if (typeof closeSearchDropdown !== 'function') {
+    window.closeSearchDropdown = function (dropdownEl) { dropdownEl.style.display = 'none'; };
+}
+if (typeof scrollIntoModal !== 'function') {
+    window.scrollIntoModal = function (el) { if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
 }
 
 let gSearchTimeout;
 document.getElementById('g_siswa_search').addEventListener('input', function () {
     clearTimeout(gSearchTimeout);
     const keyword = this.value;
-    if (keyword.length < 2) { document.getElementById('g_siswa_results').style.display = 'none'; return; }
+    const inputEl = this;
+    if (keyword.length < 2) { closeSearchDropdown(document.getElementById('g_siswa_results')); return; }
     gSearchTimeout = setTimeout(() => {
         fetch(BASE_URL + '/admin/siswa/search?keyword=' + encodeURIComponent(keyword))
             .then(r => r.json())
             .then(data => {
-                const results = document.getElementById('g_siswa_results');
-                results.innerHTML = data.length === 0
-                    ? '<div class="search-result-item" style="padding:12px 16px; color:var(--faint);">Tidak ada hasil.</div>'
-                    : data.map(s => `<div class="search-result-item" style="padding:12px 16px; cursor:pointer; border-bottom:1px solid var(--border-soft);" onclick='gSelectSiswa(${JSON.stringify(s)})'><strong>${esc(s.nama_lengkap)}</strong><br><small style="color:var(--muted);">NIS ${esc(s.nis)} · ${esc(s.nama_kelas || 'Belum dikelas')}</small></div>`).join('');
-                results.style.display = 'block';
+                const html = data.length === 0
+                    ? '<div class="search-result-item" style="color:var(--faint);">Tidak ada hasil.</div>'
+                    : data.map(s => `<div class="search-result-item" onclick='gSelectSiswa(${JSON.stringify(s)})'><strong>${esc(s.nama_lengkap)}</strong><br><small style="color:var(--muted);">NIS ${esc(s.nis)} · ${esc(s.nama_kelas || 'Belum dikelas')}</small></div>`).join('');
+                openSearchDropdown(inputEl, document.getElementById('g_siswa_results'), html);
             });
     }, 300);
 });
 function gSelectSiswa(s) {
     document.getElementById('g_id_siswa').value = s.id_siswa;
     document.getElementById('g_siswa_search').value = '';
-    document.getElementById('g_siswa_results').style.display = 'none';
+    closeSearchDropdown(document.getElementById('g_siswa_results'));
     document.getElementById('g_selected_siswa').innerHTML = `<div class="selected-siswa-box" style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--brand-bg); border:1.5px solid var(--brand-light); border-radius:var(--r-md); padding:12px 14px;"><div><strong>${esc(s.nama_lengkap)}</strong><br><small>NIS ${esc(s.nis)}</small></div><button type="button" class="icon-action danger" onclick="document.getElementById('g_id_siswa').value=''; document.getElementById('g_selected_siswa').innerHTML='';"><i class="fa-solid fa-xmark"></i></button></div>`;
+    scrollIntoModal(document.getElementById('g_selected_siswa'));
 }
-document.addEventListener('click', function (e) { if (!e.target.closest('#g_siswa_wrap')) document.getElementById('g_siswa_results').style.display = 'none'; });
+document.addEventListener('click', function (e) { if (!e.target.closest('#g_siswa_wrap') && !e.target.closest('#g_siswa_results')) closeSearchDropdown(document.getElementById('g_siswa_results')); });
 
 function handleHash() { if (location.hash === '#generate') openGenerateModal(); }
 

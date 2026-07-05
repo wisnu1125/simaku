@@ -94,11 +94,20 @@ class TagihanController extends BaseController
             ]);
         }
 
+        // Untuk tampilan awal (bukan hasil AJAX): kalau belum ada filter tahun ajaran yang
+        // dipilih sama sekali, tampilkan tahun ajaran AKTIF dulu sebagai default (tetap bisa
+        // diganti ke "Semua Tahun Ajaran" atau tahun lain lewat dropdown).
+        $initialFilterTahunAjaran = $filterTahunAjaran;
+        if (!$initialFilterTahunAjaran) {
+            $activeTA = $this->tahunAjaranModel->getActiveTahunAjaran();
+            if ($activeTA) $initialFilterTahunAjaran = $activeTA['id_tahun_ajaran'];
+        }
+        
         $data = [
             'title' => 'Tagihan',
             'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
             'kelas' => $this->kelasModel->getKelasWithTahunAjaran(),
-            'filter_tahun_ajaran' => $filterTahunAjaran,
+            'filter_tahun_ajaran' => $initialFilterTahunAjaran,
             'filter_kelas' => $filterKelas,
             'filter_status' => $filterStatus,
             'keyword' => $keyword

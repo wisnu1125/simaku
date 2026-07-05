@@ -74,12 +74,19 @@ class BeasiswaController extends BaseController
             ]);
         }
         
+        // Untuk tampilan awal: default ke tahun ajaran AKTIF kalau belum ada filter dipilih
+        $initialFilterTahunAjaran = $filterTahunAjaran;
+        if (!$initialFilterTahunAjaran) {
+            $activeTA = $this->tahunAjaranModel->getActiveTahunAjaran();
+            if ($activeTA) $initialFilterTahunAjaran = $activeTA['id_tahun_ajaran'];
+        }
+        
         $data = [
             'title' => 'Beasiswa',
             'jenis_tagihan' => $this->jenisTagihanModel->getActiveJenisTagihan(),
             'jenis_tagihan_grouped' => $this->jenisTagihanModel->getGroupedJenisTagihan(),
             'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
-            'filter_tahun_ajaran' => $filterTahunAjaran,
+            'filter_tahun_ajaran' => $initialFilterTahunAjaran,
             'keyword' => $keyword,
             'errors' => session()->getFlashdata('errors') ?? []
         ];

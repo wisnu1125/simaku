@@ -85,13 +85,20 @@ class SkemaTagihanController extends BaseController
         // supaya grup yang belum punya skema pun tetap muncul sebagai pilihan filter.
         $grupList = $this->jenisTagihanModel->select('grup_tagihan')->distinct()->orderBy('grup_tagihan', 'ASC')->findAll();
         
+        // Untuk tampilan awal: default ke tahun ajaran AKTIF kalau belum ada filter dipilih
+        $initialFilterTahunAjaran = $filterTahunAjaran;
+        if (!$initialFilterTahunAjaran) {
+            $activeTA = $this->tahunAjaranModel->getActiveTahunAjaran();
+            if ($activeTA) $initialFilterTahunAjaran = $activeTA['id_tahun_ajaran'];
+        }
+        
         $data = [
             'title' => 'Skema Tagihan',
             'jenis_tagihan_grouped' => $this->jenisTagihanModel->getGroupedJenisTagihan(),
             'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
             'kelas' => $this->kelasModel->getKelasWithTahunAjaran(),
             'grup_list' => $grupList,
-            'filter_tahun_ajaran' => $filterTahunAjaran,
+            'filter_tahun_ajaran' => $initialFilterTahunAjaran,
             'filter_grup' => $filterGrup,
             'errors' => session()->getFlashdata('errors') ?? []
         ];

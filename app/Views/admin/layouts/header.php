@@ -206,6 +206,34 @@
     .card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
     .card-pad { padding: 22px; }
 
+    /* ============================== INLINE PANEL (pengganti modal) ==============================
+       Form Tambah/Edit/Detail sekarang muncul LANGSUNG di halaman index (mendorong konten di
+       bawahnya), bukan lagi mengambang di atas dengan overlay. Lebih sederhana & tidak rawan
+       bug z-index/overflow yang sempat berulang kali muncul di pola modal sebelumnya. */
+    .inline-panel {
+        display: none; background: var(--brand-bg); border: 1.5px solid var(--brand-light);
+        border-radius: var(--r-lg); margin-bottom: 18px; overflow: hidden;
+    }
+    .inline-panel.open { display: block; animation: panel-in .2s ease; }
+    @keyframes panel-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+    .inline-panel-header {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        padding: 16px 20px; border-bottom: 1px solid var(--brand-light);
+    }
+    .inline-panel-header h3 { font-size: 15px; font-weight: 800; color: var(--brand-darker); }
+    .inline-panel-close {
+        width: 30px; height: 30px; border-radius: 50%; border: none; background: #fff;
+        color: var(--muted); cursor: pointer; flex-shrink: 0;
+    }
+    .inline-panel-close:hover { background: var(--border-soft); color: var(--ink); }
+    .inline-panel-body { padding: 20px; background: var(--surface); }
+    .inline-panel-footer {
+        display: flex; gap: 10px; padding: 14px 20px; background: var(--surface);
+        border-top: 1px solid var(--border-soft); justify-content: flex-end;
+    }
+    .inline-panel-footer .btn { flex: none; }
+    @media (max-width: 640px) { .inline-panel-footer { flex-direction: column-reverse; } .inline-panel-footer .btn { flex: 1; width: 100%; } }
+
     /* ============================== BADGES ============================== */
     .badge {
         display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
@@ -297,8 +325,9 @@
         max-height: 92vh; display: flex; flex-direction: column;
         transform: translateY(100%); transition: transform .3s cubic-bezier(.32,.72,0,1);
         box-shadow: var(--shadow-lg);
+        pointer-events: none;
     }
-    .modal.open { transform: translateY(0); }
+    .modal.open { transform: translateY(0); pointer-events: auto; }
     .modal-drag { width: 40px; height: 4px; border-radius: 999px; background: var(--border); margin: 10px auto 0; flex-shrink: 0; }
     .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0; }
     .modal-header h3 { font-size: 16px; font-weight: 800; }
@@ -308,19 +337,20 @@
     .modal-footer { display: flex; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--border-soft); flex-shrink: 0; }
     .modal-footer .btn { flex: 1; }
 
+    /* Mobile: bottom sheet (tidak berubah, sudah pas untuk layar kecil). */
     @media (min-width: 640px) {
         .modal {
-            left: 50%; right: auto; bottom: auto; top: 50%; width: 92vw; max-width: 640px;
-            border-radius: var(--r-xl); max-height: 86vh;
-            transform: translate(-50%, -48%) scale(.97); opacity: 0;
-            transition: transform .2s ease, opacity .2s ease;
+            left: auto; right: 0; top: 0; bottom: 0; width: 520px; max-width: 92vw;
+            border-radius: 0; max-height: 100vh;
+            transform: translateX(100%); opacity: 1;
+            transition: transform .3s cubic-bezier(.32,.72,0,1);
         }
-        .modal.open { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        .modal.open { transform: translateX(0); }
         .modal-drag { display: none; }
         .modal-footer .btn { flex: none; }
         .modal-footer { justify-content: flex-end; }
+        .modal.modal-wide { width: 680px; }
     }
-    .modal.modal-wide { max-width: 880px; }
 
     /* ============================== DRAWER (Detail — dari kanan) ============================== */
     .drawer {
@@ -328,8 +358,9 @@
         background: var(--surface); box-shadow: var(--shadow-lg);
         transform: translateX(100%); transition: transform .3s cubic-bezier(.32,.72,0,1);
         display: flex; flex-direction: column;
+        pointer-events: none;
     }
-    .drawer.open { transform: translateX(0); }
+    .drawer.open { transform: translateX(0); pointer-events: auto; }
     @media (min-width: 640px) { .drawer { width: 440px; } }
     .drawer-header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0; }
     .drawer-header h3 { font-size: 16px; font-weight: 800; flex: 1; }
@@ -340,6 +371,21 @@
     .info-row:last-child { border-bottom: none; }
     .info-row .k { color: var(--muted); font-weight: 500; }
     .info-row .v { color: var(--ink); font-weight: 700; text-align: right; }
+
+    /* ============================== SEARCH DROPDOWN (cari siswa, dsb) ==============================
+       Sekarang cukup position:absolute biasa (anchor ke .search-box yang position:relative) --
+       aman karena form-nya sudah tidak lagi di dalam modal yang overflow:auto. */
+    .search-box { position: relative; }
+    .search-results {
+        display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 50;
+        background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+        box-shadow: var(--shadow-lg); max-height: 240px; overflow-y: auto;
+    }
+    .search-result-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--border-soft); font-size: 13.5px; }
+    .search-result-item:last-child { border-bottom: none; }
+    .search-result-item:hover { background: var(--brand-bg); }
+    .search-result-item strong { color: var(--ink); }
+    .search-result-item small { color: var(--muted); }
 
     /* ============================== EMPTY STATE ============================== */
     .empty-state { text-align: center; padding: 56px 20px; color: var(--muted); }
@@ -389,12 +435,14 @@
         .bottom-nav-item.active { color: var(--brand); }
 
         .mobile-nav-sheet {
-            display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 1001;
+            display: flex; flex-direction: column;
+            position: fixed; left: 0; right: 0; bottom: 0; z-index: 1001;
             background: var(--surface); border-radius: var(--r-xl) var(--r-xl) 0 0;
-            max-height: 82vh; overflow-y: auto; transform: translateY(100%);
+            max-height: 85vh; transform: translateY(100%);
             transition: transform .3s cubic-bezier(.32,.72,0,1); padding-bottom: env(safe-area-inset-bottom, 0);
+            pointer-events: none;
         }
-        .mobile-nav-sheet.open { transform: translateY(0); }
+        .mobile-nav-sheet.open { transform: translateY(0); pointer-events: auto; }
 
         .field-row { grid-template-columns: 1fr; }
 

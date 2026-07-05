@@ -88,14 +88,12 @@
 <?php endif; ?>
 
 <!-- ===================== MODAL: Naik Kelas ===================== -->
-<div class="overlay" id="naikModal_overlay" onclick="closeModal('naikModal')"></div>
-<div class="modal" id="naikModal">
-    <div class="modal-drag"></div>
-    <div class="modal-header"><h3>Naikkan Kelas</h3><button type="button" class="modal-close" onclick="closeModal('naikModal')"><i class="fa-solid fa-xmark"></i></button></div>
+<div class="inline-panel" id="naikPanel">
+    <div class="inline-panel-header"><h3>Naikkan Kelas</h3><button type="button" class="inline-panel-close" onclick="closePanel('naikPanel')"><i class="fa-solid fa-xmark"></i></button></div>
     <form action="<?= base_url('admin/kenaikan-kelas/proses') ?>" method="POST" id="formNaik">
         <input type="hidden" name="id_kelas_asal" value="<?= $kelas_detail['id_kelas'] ?? '' ?>">
         <div id="naikSiswaIds"></div>
-        <div class="modal-body">
+        <div class="inline-panel-body">
             <p style="font-size:13px; color:var(--body); margin-bottom:16px;"><strong id="naikCount">0</strong> siswa akan dipindahkan dari <strong><?= esc($kelas_detail['nama_kelas'] ?? '') ?></strong> ke kelas tujuan berikut:</p>
             <div class="field">
                 <label class="required">Kelas Tujuan</label>
@@ -109,29 +107,27 @@
                 </select>
             </div>
         </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('naikModal')">Batal</button>
+        <div class="inline-panel-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePanel('naikPanel')">Batal</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Proses Kenaikan Kelas</button>
         </div>
     </form>
 </div>
 
 <!-- ===================== MODAL: Kelulusan ===================== -->
-<div class="overlay" id="lulusModal_overlay" onclick="closeModal('lulusModal')"></div>
-<div class="modal" id="lulusModal">
-    <div class="modal-drag"></div>
-    <div class="modal-header"><h3>Luluskan Siswa</h3><button type="button" class="modal-close" onclick="closeModal('lulusModal')"><i class="fa-solid fa-xmark"></i></button></div>
+<div class="inline-panel" id="lulusPanel">
+    <div class="inline-panel-header"><h3>Luluskan Siswa</h3><button type="button" class="inline-panel-close" onclick="closePanel('lulusPanel')"><i class="fa-solid fa-xmark"></i></button></div>
     <form action="<?= base_url('admin/kenaikan-kelas/proses-kelulusan') ?>" method="POST" id="formLulus">
         <input type="hidden" name="id_kelas" value="<?= $kelas_detail['id_kelas'] ?? '' ?>">
         <div id="lulusSiswaIds"></div>
-        <div class="modal-body">
+        <div class="inline-panel-body">
             <div class="hint-box" style="background:var(--warning-bg); border:1px solid var(--warning-border); border-radius:var(--r-md); padding:12px 14px; font-size:12.5px; color:#78350f; display:flex; gap:10px;">
                 <i class="fa-solid fa-triangle-exclamation" style="margin-top:1px;"></i>
                 <span><strong id="lulusCount">0</strong> siswa akan ditandai <strong>lulus</strong> dan dikeluarkan dari kelas <strong><?= esc($kelas_detail['nama_kelas'] ?? '') ?></strong>. Tindakan ini tidak membatalkan tagihan yang sudah ada.</span>
             </div>
         </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('lulusModal')">Batal</button>
+        <div class="inline-panel-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePanel('lulusPanel')">Batal</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-graduation-cap"></i> Proses Kelulusan</button>
         </div>
     </form>
@@ -156,14 +152,14 @@ function openNaikModal() {
     if (ids.length === 0) return;
     document.getElementById('naikCount').textContent = ids.length;
     buildHiddenInputs('naikSiswaIds', ids);
-    openModal('naikModal');
+    openPanel('naikPanel');
 }
 function openLulusModal() {
     const ids = getSelectedIds();
     if (ids.length === 0) return;
     document.getElementById('lulusCount').textContent = ids.length;
     buildHiddenInputs('lulusSiswaIds', ids);
-    openModal('lulusModal');
+    openPanel('lulusPanel');
 }
 </script>
 

@@ -7,7 +7,16 @@ use App\Models\SiswaModel;
 use App\Models\KelasModel;
 use App\Models\AuditLogModel;
 use App\Models\TagihanModel;
+use App\Models\TahunAjaranModel;
 use App\Services\SiswaService;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class SiswaController extends BaseController
 {
@@ -16,6 +25,7 @@ class SiswaController extends BaseController
     protected $auditLogModel;
     protected $siswaService;
     protected $tagihanModel;
+    protected $tahunAjaranModel;
     
     public function __construct()
     {
@@ -24,6 +34,7 @@ class SiswaController extends BaseController
         $this->auditLogModel = new AuditLogModel();
         $this->siswaService = new SiswaService();
         $this->tagihanModel = new TagihanModel();
+        $this->tahunAjaranModel = new TahunAjaranModel();
     }
     
     /**
@@ -45,7 +56,9 @@ class SiswaController extends BaseController
             // Kelas dipakai untuk dropdown filter & dropdown di modal form -- datanya kecil,
             // aman selalu di-load langsung (bukan sumber masalah performa).
             'kelas_list' => $this->kelasModel->getKelasWithTahunAjaran(),
-            'errors'     => session()->getFlashdata('errors') ?? []
+            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
+            'errors'     => session()->getFlashdata('errors') ?? [],
+            'import_result' => session()->getFlashdata('import_result') ?? null
         ];
         
         return view('admin/siswa/index', $data);
@@ -61,24 +74,30 @@ class SiswaController extends BaseController
         $q       = trim((string) $this->request->getGet('q'));
         $fKelas  = $this->request->getGet('kelas');
         $fStatus = $this->request->getGet('status');
+        $fTA     = $this->request->getGet('ta');
         
         // Query baris untuk halaman ini
         $listModel = new SiswaModel();
         $listModel->select('siswa.*, kelas.nama_kelas, kelas.tingkat')
                   ->join('kelas', 'kelas.id_kelas = siswa.id_kelas', 'left');
-        $this->applySiswaFilters($listModel, $q, $fKelas, $fStatus);
+        $this->applySiswaFilters($listModel, $q, $fKelas, $fStatus, $fTA);
         $listModel->orderBy('siswa.id_siswa', 'DESC');
         
         // false = jangan reset query builder, supaya where/join di atas masih kepakai buat limit() di bawah
         $total = $listModel->countAllResults(false);
         $rows  = $listModel->limit($perPage, ($page - 1) * $perPage)->findAll();
         
-        // Statistik ringkas (dihitung dari SELURUH data, bukan cuma halaman ini yang sedang tampil).
-        // Pakai instance model baru masing-masing supaya query-nya independen/tidak nyampur.
+        // Statistik ringkas -- ikut disaring tahun ajaran yang sama (bukan status/kelas/pencarian),
+        // supaya angka di kartu ringkasan konsisten dengan tahun ajaran yang sedang dilihat.
+        $statsBase = function () use ($fTA) {
+            $m = new SiswaModel();
+            if ($fTA) $m->join('kelas', 'kelas.id_kelas = siswa.id_kelas', 'left')->where('kelas.id_tahun_ajaran', $fTA);
+            return $m;
+        };
         $stats = [
-            'total' => (new SiswaModel())->countAllResults(),
-            'aktif' => (new SiswaModel())->where('status_siswa', 'aktif')->countAllResults(),
-            'lulus' => (new SiswaModel())->where('status_siswa', 'lulus')->countAllResults(),
+            'total' => $statsBase()->countAllResults(),
+            'aktif' => $statsBase()->where('status_siswa', 'aktif')->countAllResults(),
+            'lulus' => $statsBase()->where('status_siswa', 'lulus')->countAllResults(),
         ];
         
         return $this->response->setJSON([
@@ -91,7 +110,7 @@ class SiswaController extends BaseController
         ]);
     }
     
-    private function applySiswaFilters($builder, string $q, $fKelas, $fStatus)
+    private function applySiswaFilters($builder, string $q, $fKelas, $fStatus, $fTA = null)
     {
         if ($q !== '') {
             $builder->groupStart()
@@ -105,6 +124,9 @@ class SiswaController extends BaseController
         }
         if (!empty($fStatus)) {
             $builder->where('siswa.status_siswa', $fStatus);
+        }
+        if (!empty($fTA)) {
+            $builder->where('kelas.id_tahun_ajaran', $fTA);
         }
     }
     
@@ -130,7 +152,7 @@ class SiswaController extends BaseController
             'tanggal_lahir' => 'required|valid_date',
             'jenis_kelamin' => 'required|in_list[L,P]',
             'id_kelas' => 'permit_empty|integer',
-            'virtual_account' => 'permit_empty|is_unique[siswa.virtual_account]|max_length[20]'
+            'virtual_account' => 'permit_empty|max_length[20]'
         ];
         
         if (!$this->validate($rules)) {
@@ -253,7 +275,7 @@ class SiswaController extends BaseController
             'jenis_kelamin' => 'required|in_list[L,P]',
             'status_siswa' => 'required|in_list[aktif,nonaktif,lulus]',
             'id_kelas' => 'permit_empty|integer',
-            'virtual_account' => "required|is_unique[siswa.virtual_account,id_siswa,{$id}]|max_length[20]"
+            'virtual_account' => "required|max_length[20]"
         ];
         
         if (!$this->validate($rules)) {
@@ -340,5 +362,265 @@ class SiswaController extends BaseController
         $siswa = $this->siswaModel->searchSiswa($keyword, 10);
         
         return $this->response->setJSON($siswa);
+    }
+    
+    /**
+     * Unduh template Excel untuk impor siswa.
+     * Dibuat dinamis (bukan file statis) supaya daftar kelas yang muncul di dropdown
+     * validasi selalu sesuai kelas yang benar-benar ada saat ini.
+     */
+    public function importTemplate()
+    {
+        $kelasList = $this->kelasModel->getKelasWithTahunAjaran();
+        
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Data Siswa');
+        
+        $headers = ['NIS*', 'NISN', 'Nama Lengkap*', 'Tanggal Lahir* (YYYY-MM-DD)', 'Jenis Kelamin* (L/P)', 'Kelas', 'Nama Wali', 'No. Telepon Wali', 'Alamat', 'Virtual Account'];
+        $lastColIndex = count($headers) - 1;
+        $lastCol = chr(65 + $lastColIndex);
+        
+        foreach ($headers as $i => $h) {
+            $sheet->setCellValue(chr(65 + $i) . '1', $h);
+        }
+        $sheet->getStyle('A1:' . $lastCol . '1')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sheet->getStyle('A1:' . $lastCol . '1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('0D9488');
+        $sheet->getStyle('A1:' . $lastCol . '1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
+        $sheet->getRowDimension(1)->setRowHeight(32);
+        
+        // Baris contoh (ditandai jelas supaya dihapus sebelum benar-benar diimpor)
+        $contohKelas = $kelasList[0]['nama_kelas'] ?? '';
+        $sheet->fromArray(['2024999', '0012345678', 'Contoh Nama Siswa', '2012-05-14', 'L', $contohKelas, 'Nama Wali Contoh', '081234567890', 'Alamat contoh', ''], null, 'A2');
+        $sheet->getStyle('A2:' . $lastCol . '2')->getFont()->setItalic(true)->getColor()->setRGB('94A3B8');
+        
+        // Kolom yang rawan salah format kalau dianggap angka oleh Excel (NIS/NISN/telepon
+        // bisa kehilangan angka 0 di depan) -- paksa jadi format Teks.
+        foreach (['A', 'B', 'H', 'J'] as $col) {
+            $sheet->getStyle($col . '2:' . $col . '1000')->getNumberFormat()->setFormatCode('@');
+        }
+        
+        // Sheet tersembunyi berisi daftar nama kelas valid, dipakai sebagai sumber dropdown
+        // (bukan daftar inline, karena nama kelas bisa panjang & banyak -- lebih aman pakai referensi sheet).
+        $refSheet = $spreadsheet->createSheet();
+        $refSheet->setTitle('_ReferensiKelas');
+        $refSheet->setCellValue('A1', 'Daftar Kelas Valid');
+        $refSheet->getStyle('A1')->getFont()->setBold(true);
+        $kelasNames = array_values(array_unique(array_column($kelasList, 'nama_kelas')));
+        foreach ($kelasNames as $i => $nama) {
+            $refSheet->setCellValue('A' . ($i + 2), $nama);
+        }
+        $refSheet->setSheetState(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::SHEETSTATE_HIDDEN);
+        $lastKelasRow = count($kelasNames) + 1;
+        
+        // Data validation: Jenis Kelamin (dropdown L/P)
+        for ($r = 2; $r <= 500; $r++) {
+            $dv = $sheet->getCell('E' . $r)->getDataValidation();
+            $dv->setType(DataValidation::TYPE_LIST);
+            $dv->setErrorStyle(DataValidation::STYLE_STOP);
+            $dv->setAllowBlank(false);
+            $dv->setShowDropDown(true);
+            $dv->setShowErrorMessage(true);
+            $dv->setErrorTitle('Pilihan tidak valid');
+            $dv->setError('Isi hanya dengan L atau P.');
+            $dv->setFormula1('"L,P"');
+            
+            // Data validation: Kelas (dropdown dari sheet referensi), kalau ada datanya
+            if ($lastKelasRow >= 2) {
+                $dvKelas = $sheet->getCell('F' . $r)->getDataValidation();
+                $dvKelas->setType(DataValidation::TYPE_LIST);
+                $dvKelas->setErrorStyle(DataValidation::STYLE_WARNING);
+                $dvKelas->setAllowBlank(true);
+                $dvKelas->setShowDropDown(true);
+                $dvKelas->setShowErrorMessage(true);
+                $dvKelas->setErrorTitle('Nama kelas tidak dikenali');
+                $dvKelas->setError('Nama kelas tidak ada di daftar. Boleh dikosongkan kalau belum ditentukan.');
+                $dvKelas->setFormula1('_ReferensiKelas!$A$2:$A$' . $lastKelasRow);
+            }
+        }
+        
+        foreach (range('A', $lastCol) as $col) {
+            $sheet->getColumnDimension($col)->setWidth(20);
+        }
+        $sheet->getColumnDimension('I')->setWidth(30);
+        $sheet->freezePane('A2');
+        $sheet->getStyle('A1:' . $lastCol . '2')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        
+        $spreadsheet->setActiveSheetIndex(0);
+        
+        $filename = 'Template_Import_Siswa.xlsx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment;filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        
+        $writer = new Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
+    }
+    
+    /**
+     * Proses impor siswa dari file Excel yang diunggah.
+     * Baris valid langsung disimpan; baris bermasalah dilewati dan dilaporkan (bukan
+     * gagal semua-atau-tidak-sama-sekali), supaya satu baris salah tidak menggagalkan
+     * ratusan baris lain yang sudah benar.
+     */
+    public function import()
+    {
+        $file = $this->request->getFile('file');
+        
+        if (!$file || !$file->isValid()) {
+            return redirect()->to(base_url('admin/siswa#impor'))->with('error', 'File tidak ditemukan atau gagal diunggah.');
+        }
+        
+        $ext = strtolower($file->getClientExtension() ?: pathinfo($file->getClientName(), PATHINFO_EXTENSION));
+        if (!in_array($ext, ['xlsx', 'xls'])) {
+            return redirect()->to(base_url('admin/siswa#impor'))->with('error', 'File harus berformat Excel (.xlsx atau .xls).');
+        }
+        
+        try {
+            $reader = IOFactory::createReaderForFile($file->getTempName());
+            $reader->setReadDataOnly(false); // tetap false supaya bisa deteksi format tanggal asli
+            $spreadsheet = $reader->load($file->getTempName());
+            $sheet = $spreadsheet->getSheetByName('Data Siswa') ?: $spreadsheet->getSheet(0);
+        } catch (\Throwable $e) {
+            return redirect()->to(base_url('admin/siswa#impor'))->with('error', 'Gagal membaca file Excel. Pastikan menggunakan template yang disediakan.');
+        }
+        
+        $highestRow = $sheet->getHighestRow();
+        
+        // Data pembanding untuk cek duplikat tanpa query berulang per baris
+        $kelasList = $this->kelasModel->findAll();
+        $kelasMap = [];
+        foreach ($kelasList as $k) {
+            $kelasMap[strtolower(trim($k['nama_kelas']))] = $k['id_kelas'];
+        }
+        $existingNis = array_flip(array_map('strval', array_column($this->siswaModel->select('nis')->findAll(), 'nis')));
+        $existingNisn = array_flip(array_filter(array_map('strval', array_column($this->siswaModel->select('nisn')->findAll(), 'nisn'))));
+        $seenNisInFile = [];
+        
+        $successCount = 0;
+        $errors = [];
+        $totalDataRows = 0;
+        
+        for ($row = 2; $row <= $highestRow; $row++) {
+            $nis = trim((string) $sheet->getCell('A' . $row)->getCalculatedValue());
+            $nisn = trim((string) $sheet->getCell('B' . $row)->getCalculatedValue());
+            $namaLengkap = trim((string) $sheet->getCell('C' . $row)->getCalculatedValue());
+            $jenisKelamin = strtoupper(trim((string) $sheet->getCell('E' . $row)->getCalculatedValue()));
+            $namaKelas = trim((string) $sheet->getCell('F' . $row)->getCalculatedValue());
+            $namaWali = trim((string) $sheet->getCell('G' . $row)->getCalculatedValue());
+            $telpWali = trim((string) $sheet->getCell('H' . $row)->getCalculatedValue());
+            $alamat = trim((string) $sheet->getCell('I' . $row)->getCalculatedValue());
+            $virtualAccount = trim((string) $sheet->getCell('J' . $row)->getCalculatedValue());
+            
+            // Baris kosong total (bukan bagian dari data, biasanya sisa baris kosong di akhir file) -> lewati diam-diam
+            if ($nis === '' && $namaLengkap === '') {
+                continue;
+            }
+            $totalDataRows++;
+            
+            // Bersihkan angka yang kebawa desimal ".0" kalau Excel sempat membacanya sebagai angka
+            $nis = preg_replace('/\.0$/', '', $nis);
+            $nisn = preg_replace('/\.0$/', '', $nisn);
+            
+            $tanggalLahirCell = $sheet->getCell('D' . $row);
+            $tanggalLahir = $this->parseExcelDate($tanggalLahirCell);
+            
+            // ---- Validasi ----
+            if ($nis === '') { $errors[] = "Baris $row: NIS kosong, baris dilewati."; continue; }
+            if ($namaLengkap === '') { $errors[] = "Baris $row (NIS $nis): Nama Lengkap kosong, baris dilewati."; continue; }
+            if (!in_array($jenisKelamin, ['L', 'P'])) { $errors[] = "Baris $row (NIS $nis): Jenis Kelamin harus L atau P, baris dilewati."; continue; }
+            if (!$tanggalLahir) { $errors[] = "Baris $row (NIS $nis): Tanggal Lahir tidak valid, baris dilewati."; continue; }
+            if (isset($existingNis[$nis]) || isset($seenNisInFile[$nis])) { $errors[] = "Baris $row: NIS $nis sudah terdaftar" . (isset($seenNisInFile[$nis]) ? ' (duplikat di dalam file ini)' : ' di database') . ", baris dilewati."; continue; }
+            if ($nisn !== '' && isset($existingNisn[$nisn])) { $errors[] = "Baris $row (NIS $nis): NISN $nisn sudah dipakai siswa lain, baris dilewati."; continue; }
+            
+            $idKelas = null;
+            if ($namaKelas !== '') {
+                if (isset($kelasMap[strtolower($namaKelas)])) {
+                    $idKelas = $kelasMap[strtolower($namaKelas)];
+                } else {
+                    $errors[] = "Baris $row (NIS $nis): Kelas \"$namaKelas\" tidak ditemukan, siswa tetap ditambahkan tanpa kelas.";
+                }
+            }
+            
+            // Virtual Account boleh sama antar siswa (memang disengaja, bukan bug) -- jadi di sini
+            // tidak dicek duplikat sama sekali, cukup dibersihkan formatnya saja.
+            if ($virtualAccount !== '') {
+                $virtualAccount = preg_replace('/\.0$/', '', $virtualAccount);
+            } else {
+                $virtualAccount = $this->siswaService->generateVirtualAccount();
+            }
+            
+            $data = [
+                'nis' => $nis,
+                'nisn' => $nisn ?: null,
+                'nama_lengkap' => $namaLengkap,
+                'tanggal_lahir' => $tanggalLahir,
+                'jenis_kelamin' => $jenisKelamin,
+                'alamat' => $alamat ?: null,
+                'nama_wali' => $namaWali ?: null,
+                'telp_wali' => $telpWali ?: null,
+                'id_kelas' => $idKelas,
+                'virtual_account' => $virtualAccount,
+                'status_siswa' => 'aktif'
+            ];
+            
+            if ($this->siswaModel->insert($data)) {
+                $successCount++;
+                $existingNis[$nis] = true;
+                $seenNisInFile[$nis] = true;
+                if ($nisn) $existingNisn[$nisn] = true;
+            } else {
+                $rowErrors = $this->siswaModel->errors();
+                $errors[] = "Baris $row (NIS $nis): " . (reset($rowErrors) ?: 'Gagal disimpan') . ", baris dilewati.";
+            }
+        }
+        
+        $this->auditLogModel->insert([
+            'id_user' => session()->get('id_user'),
+            'aksi' => 'import',
+            'modul' => 'siswa',
+            'data_baru' => json_encode(['file' => $file->getClientName(), 'berhasil' => $successCount, 'gagal' => count($errors)]),
+            'ip_address' => $this->request->getIPAddress(),
+            'user_agent' => $this->request->getUserAgent()->getAgentString(),
+            'keterangan' => "Impor Excel: {$successCount} siswa berhasil ditambahkan dari {$totalDataRows} baris ({$file->getClientName()})"
+        ]);
+        
+        return redirect()->to(base_url('admin/siswa#impor'))->with('import_result', [
+            'success_count' => $successCount,
+            'total_rows' => $totalDataRows,
+            'errors' => $errors,
+        ]);
+    }
+    
+    /**
+     * Baca tanggal dari sel Excel dengan aman, baik saat sel diformat sebagai
+     * tanggal asli (serial number) maupun diisi sebagai teks biasa.
+     */
+    private function parseExcelDate($cell)
+    {
+        $value = $cell->getCalculatedValue();
+        if (empty($value) && $value !== 0) return null;
+        
+        if (is_numeric($value) && ExcelDate::isDateTime($cell)) {
+            try {
+                return ExcelDate::excelToDateTimeObject($value)->format('Y-m-d');
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+        
+        $value = trim((string) $value);
+        if ($value === '') return null;
+        
+        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'Y/m/d'] as $format) {
+            $dt = \DateTime::createFromFormat($format, $value);
+            if ($dt !== false && $dt->format($format) === $value) {
+                return $dt->format('Y-m-d');
+            }
+        }
+        
+        $ts = strtotime($value);
+        return $ts !== false ? date('Y-m-d', $ts) : null;
     }
 }

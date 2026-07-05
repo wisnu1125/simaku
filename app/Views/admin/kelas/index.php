@@ -29,13 +29,11 @@
 <div id="emptyState" style="display:none;"></div>
 
 <!-- ===================== MODAL: Tambah / Edit ===================== -->
-<div class="overlay" id="kelasModal_overlay" onclick="closeModal('kelasModal')"></div>
-<div class="modal" id="kelasModal">
-    <div class="modal-drag"></div>
-    <div class="modal-header"><h3 id="kelasModalTitle">Tambah Kelas</h3><button type="button" class="modal-close" onclick="closeModal('kelasModal')"><i class="fa-solid fa-xmark"></i></button></div>
+<div class="inline-panel" id="kelasPanel">
+    <div class="inline-panel-header"><h3 id="kelasModalTitle">Tambah Kelas</h3><button type="button" class="inline-panel-close" onclick="closePanel('kelasPanel')"><i class="fa-solid fa-xmark"></i></button></div>
     <form id="kelasForm" action="<?= base_url('admin/kelas/store') ?>" method="POST">
         <input type="hidden" name="editing_id" id="f_editing_id" value="<?= esc(old('editing_id', '')) ?>">
-        <div class="modal-body">
+        <div class="inline-panel-body">
             <div class="field">
                 <label class="required">Nama Kelas</label>
                 <input class="input" name="nama_kelas" id="f_nama" placeholder="Contoh: 7 Bung Tomo" value="<?= esc(old('nama_kelas', '')) ?>" required>
@@ -56,8 +54,8 @@
                 </div>
             </div>
         </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('kelasModal')">Batal</button>
+        <div class="inline-panel-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePanel('kelasPanel')">Batal</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Simpan</button>
         </div>
     </form>
@@ -110,7 +108,7 @@ function openCreateModal() {
     document.getElementById('kelasModalTitle').textContent = 'Tambah Kelas';
     document.getElementById('kelasForm').action = BASE_URL + '/admin/kelas/store';
     document.getElementById('f_ta').value = fTA || (TAHUN_AJARAN.find(t => t.status === 'aktif')?.id_tahun_ajaran ?? '');
-    openModal('kelasModal');
+    openPanel('kelasPanel');
 }
 
 function openEditModal(id) {
@@ -123,7 +121,7 @@ function openEditModal(id) {
     document.getElementById('f_nama').value = k.nama_kelas;
     document.getElementById('f_tingkat').value = k.tingkat;
     document.getElementById('f_ta').value = k.id_tahun_ajaran;
-    openModal('kelasModal');
+    openPanel('kelasPanel');
 }
 
 function handleHash() {
@@ -151,7 +149,7 @@ if (HAS_ERRORS) {
     } else {
         document.getElementById('kelasForm').action = BASE_URL + '/admin/kelas/store';
     }
-    openModal('kelasModal');
+    openPanel('kelasPanel');
 } else if (location.hash) {
     handleHash();
 }

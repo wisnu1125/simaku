@@ -60,12 +60,10 @@
 </div>
 
 <!-- ===================== MODAL: Tambah (checklist massal) ===================== -->
-<div class="overlay" id="addModal_overlay" onclick="closeModal('addModal')"></div>
-<div class="modal modal-wide" id="addModal">
-    <div class="modal-drag"></div>
-    <div class="modal-header"><h3>Tambah Skema Tagihan</h3><button type="button" class="modal-close" onclick="closeModal('addModal')"><i class="fa-solid fa-xmark"></i></button></div>
+<div class="inline-panel" id="addPanel">
+    <div class="inline-panel-header"><h3>Tambah Skema Tagihan</h3><button type="button" class="inline-panel-close" onclick="closePanel('addPanel')"><i class="fa-solid fa-xmark"></i></button></div>
     <form id="addForm" action="<?= base_url('admin/skema-tagihan/store-bulk') ?>" method="POST">
-        <div class="modal-body">
+        <div class="inline-panel-body">
             <div class="hint-box">
                 <i class="fa-solid fa-circle-info" style="margin-top:1px;"></i>
                 <span>Centang tagihan yang ingin dibuat skemanya, isi nominal per item, lalu Simpan. Tagihan bertipe <strong>bulanan</strong> otomatis dibuat 12 skema (Bulan 1–12) kecuali Anda pilih bulan tertentu.</span>
@@ -97,9 +95,9 @@
                 </div>
                 <div class="field" id="a_siswa_wrap" style="display:none;">
                     <label class="required">Cari Siswa</label>
-                    <div class="search-box" style="position:relative;">
+                    <div class="search-box">
                         <input type="text" class="input" id="a_siswa_search" placeholder="Ketik NIS atau nama…" autocomplete="off">
-                        <div class="search-results" id="a_siswa_results" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:30; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--shadow-md); max-height:200px; overflow-y:auto;"></div>
+                        <div class="search-results" id="a_siswa_results"></div>
                     </div>
                     <input type="hidden" name="id_siswa" id="a_id_siswa">
                     <div id="a_selected_siswa" style="margin-top:8px;"></div>
@@ -140,20 +138,18 @@
                 <span><i class="fa-solid fa-layer-group"></i> ≈<span id="a_total_skema">0</span> skema akan dibuat</span>
             </div>
         </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('addModal')">Batal</button>
+        <div class="inline-panel-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePanel('addPanel')">Batal</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-wand-magic-sparkles"></i> Simpan</button>
         </div>
     </form>
 </div>
 
 <!-- ===================== MODAL: Edit (satu baris) ===================== -->
-<div class="overlay" id="editModal_overlay" onclick="closeModal('editModal')"></div>
-<div class="modal" id="editModal">
-    <div class="modal-drag"></div>
-    <div class="modal-header"><h3>Edit Skema Tagihan</h3><button type="button" class="modal-close" onclick="closeModal('editModal')"><i class="fa-solid fa-xmark"></i></button></div>
+<div class="inline-panel" id="editPanel">
+    <div class="inline-panel-header"><h3>Edit Skema Tagihan</h3><button type="button" class="inline-panel-close" onclick="closePanel('editPanel')"><i class="fa-solid fa-xmark"></i></button></div>
     <form id="editForm" method="POST">
-        <div class="modal-body">
+        <div class="inline-panel-body">
             <div class="field">
                 <label class="required">Berlaku Untuk</label>
                 <div class="segmented">
@@ -170,9 +166,9 @@
             </div>
             <div class="field" id="e_siswa_wrap" style="display:none;">
                 <label class="required">Cari Siswa</label>
-                <div class="search-box" style="position:relative;">
+                <div class="search-box">
                     <input type="text" class="input" id="e_siswa_search" placeholder="Ketik NIS atau nama…" autocomplete="off">
-                    <div class="search-results" id="e_siswa_results" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:30; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--shadow-md); max-height:200px; overflow-y:auto;"></div>
+                    <div class="search-results" id="e_siswa_results"></div>
                 </div>
                 <input type="hidden" name="id_siswa" id="e_id_siswa">
                 <div id="e_selected_siswa" style="margin-top:8px;"></div>
@@ -217,8 +213,8 @@
                 <textarea class="input" name="keterangan" id="e_ket" rows="2"></textarea>
             </div>
         </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">Batal</button>
+        <div class="inline-panel-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePanel('editPanel')">Batal</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Simpan Perubahan</button>
         </div>
     </form>
@@ -329,7 +325,7 @@ function openCreateModal() {
     document.querySelectorAll('.st-item').forEach(el => el.classList.remove('checked'));
     document.querySelectorAll('.nominal-input, .bulan-select').forEach(el => el.disabled = true);
     updateAddSummary();
-    openModal('addModal');
+    openPanel('addPanel');
 }
 function toggleGrup(grup, checked) {
     document.querySelectorAll(`input[data-grup="${grup}"][name="tagihan[]"]`).forEach(cb => { cb.checked = checked; toggleItem(cb.value); });
@@ -368,27 +364,48 @@ function updateAddSummary() {
     document.getElementById('a_total_skema').textContent = totalSkema;
 }
 
+if (typeof openSearchDropdown !== 'function') {
+    window.openSearchDropdown = function (inputEl, dropdownEl, html) {
+        dropdownEl.innerHTML = html;
+        const rect = inputEl.getBoundingClientRect();
+        dropdownEl.style.position = 'fixed';
+        dropdownEl.style.left = rect.left + 'px';
+        dropdownEl.style.right = 'auto';
+        dropdownEl.style.top = (rect.bottom + 6) + 'px';
+        dropdownEl.style.width = rect.width + 'px';
+        dropdownEl.style.margin = '0';
+        dropdownEl.style.display = 'block';
+    };
+}
+if (typeof closeSearchDropdown !== 'function') {
+    window.closeSearchDropdown = function (dropdownEl) { dropdownEl.style.display = 'none'; };
+}
+if (typeof scrollIntoModal !== 'function') {
+    window.scrollIntoModal = function (el) { if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+}
+
 let aSearchTimeout;
 document.getElementById('a_siswa_search').addEventListener('input', function () {
     clearTimeout(aSearchTimeout);
     const keyword = this.value;
-    if (keyword.length < 2) { document.getElementById('a_siswa_results').style.display = 'none'; return; }
+    const inputEl = this;
+    if (keyword.length < 2) { closeSearchDropdown(document.getElementById('a_siswa_results')); return; }
     aSearchTimeout = setTimeout(() => {
         fetch(BASE_URL + '/admin/siswa/search?keyword=' + encodeURIComponent(keyword)).then(r => r.json()).then(data => {
-            const results = document.getElementById('a_siswa_results');
-            results.innerHTML = data.length === 0 ? '<div class="search-result-item" style="padding:12px 16px; color:var(--faint);">Tidak ada hasil.</div>'
-                : data.map(s => `<div class="search-result-item" style="padding:12px 16px; cursor:pointer; border-bottom:1px solid var(--border-soft);" onclick='aSelectSiswa(${JSON.stringify(s)})'><strong>${esc(s.nama_lengkap)}</strong><br><small style="color:var(--muted);">NIS ${esc(s.nis)}</small></div>`).join('');
-            results.style.display = 'block';
+            const html = data.length === 0 ? '<div class="search-result-item" style="color:var(--faint);">Tidak ada hasil.</div>'
+                : data.map(s => `<div class="search-result-item" onclick='aSelectSiswa(${JSON.stringify(s)})'><strong>${esc(s.nama_lengkap)}</strong><br><small style="color:var(--muted);">NIS ${esc(s.nis)}</small></div>`).join('');
+            openSearchDropdown(inputEl, document.getElementById('a_siswa_results'), html);
         });
     }, 300);
 });
 function aSelectSiswa(s) {
     document.getElementById('a_id_siswa').value = s.id_siswa;
     document.getElementById('a_siswa_search').value = '';
-    document.getElementById('a_siswa_results').style.display = 'none';
+    closeSearchDropdown(document.getElementById('a_siswa_results'));
     document.getElementById('a_selected_siswa').innerHTML = `<div class="selected-siswa-box" style="background:var(--brand-bg); border:1.5px solid var(--brand-light); border-radius:var(--r-md); padding:10px 14px;"><strong>${esc(s.nama_lengkap)}</strong> <small>(NIS ${esc(s.nis)})</small></div>`;
+    scrollIntoModal(document.getElementById('a_selected_siswa'));
 }
-document.addEventListener('click', e => { if (!e.target.closest('#a_siswa_wrap')) document.getElementById('a_siswa_results').style.display = 'none'; if (!e.target.closest('#e_siswa_wrap')) document.getElementById('e_siswa_results').style.display = 'none'; });
+document.addEventListener('click', e => { if (!e.target.closest('#a_siswa_wrap') && !e.target.closest('#a_siswa_results')) closeSearchDropdown(document.getElementById('a_siswa_results')); if (!e.target.closest('#e_siswa_wrap') && !e.target.closest('#e_siswa_results')) closeSearchDropdown(document.getElementById('e_siswa_results')); });
 
 // ===================== MODAL: Edit (satu baris) =====================
 function setEditTipe(v) {
@@ -419,7 +436,7 @@ function fillEditForm(sk) {
     document.getElementById('e_nominal').value = Math.round(sk.nominal);
     document.getElementById('e_bulan').value = sk.bulan_tagihan || '';
     document.getElementById('e_ket').value = sk.keterangan || '';
-    openModal('editModal');
+    openPanel('editPanel');
 }
 
 function openEditModal(id) {
@@ -435,20 +452,20 @@ let eSearchTimeout;
 document.getElementById('e_siswa_search').addEventListener('input', function () {
     clearTimeout(eSearchTimeout);
     const keyword = this.value;
-    if (keyword.length < 2) { document.getElementById('e_siswa_results').style.display = 'none'; return; }
+    const inputEl = this;
+    if (keyword.length < 2) { closeSearchDropdown(document.getElementById('e_siswa_results')); return; }
     eSearchTimeout = setTimeout(() => {
         fetch(BASE_URL + '/admin/siswa/search?keyword=' + encodeURIComponent(keyword)).then(r => r.json()).then(data => {
-            const results = document.getElementById('e_siswa_results');
-            results.innerHTML = data.length === 0 ? '<div class="search-result-item" style="padding:12px 16px; color:var(--faint);">Tidak ada hasil.</div>'
-                : data.map(s => `<div class="search-result-item" style="padding:12px 16px; cursor:pointer; border-bottom:1px solid var(--border-soft);" onclick='eSelectSiswa(${JSON.stringify(s)})'><strong>${esc(s.nama_lengkap)}</strong><br><small style="color:var(--muted);">NIS ${esc(s.nis)}</small></div>`).join('');
-            results.style.display = 'block';
+            const html = data.length === 0 ? '<div class="search-result-item" style="color:var(--faint);">Tidak ada hasil.</div>'
+                : data.map(s => `<div class="search-result-item" onclick='eSelectSiswa(${JSON.stringify(s)})'><strong>${esc(s.nama_lengkap)}</strong><br><small style="color:var(--muted);">NIS ${esc(s.nis)}</small></div>`).join('');
+            openSearchDropdown(inputEl, document.getElementById('e_siswa_results'), html);
         });
     }, 300);
 });
 function eSelectSiswa(s) {
     document.getElementById('e_id_siswa').value = s.id_siswa;
     document.getElementById('e_siswa_search').value = '';
-    document.getElementById('e_siswa_results').style.display = 'none';
+    closeSearchDropdown(document.getElementById('e_siswa_results'));
     document.getElementById('e_selected_siswa').innerHTML = `<div class="selected-siswa-box" style="background:var(--brand-bg); border:1.5px solid var(--brand-light); border-radius:var(--r-md); padding:10px 14px;"><strong>${esc(s.nama_lengkap)}</strong> <small>(NIS ${esc(s.nis)})</small></div>`;
 }
 

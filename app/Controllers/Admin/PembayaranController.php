@@ -7,6 +7,7 @@ use App\Models\PembayaranModel;
 use App\Models\TagihanModel;
 use App\Models\SiswaModel;
 use App\Models\AuditLogModel;
+use App\Models\TahunAjaranModel;
 
 class PembayaranController extends BaseController
 {
@@ -14,6 +15,7 @@ class PembayaranController extends BaseController
     protected $tagihanModel;
     protected $siswaModel;
     protected $auditLogModel;
+    protected $tahunAjaranModel;
     
     public function __construct()
     {
@@ -21,6 +23,7 @@ class PembayaranController extends BaseController
         $this->tagihanModel = new TagihanModel();
         $this->siswaModel = new SiswaModel();
         $this->auditLogModel = new AuditLogModel();
+        $this->tahunAjaranModel = new TahunAjaranModel();
     }
     
     /**
@@ -31,8 +34,9 @@ class PembayaranController extends BaseController
         $keyword = $this->request->getGet('keyword');
         $filterStatus = $this->request->getGet('filter_status');
         $filterMetode = $this->request->getGet('filter_metode');
+        $filterTA = $this->request->getGet('filter_tahun_ajaran');
         
-        $applyFilters = function ($model) use ($keyword, $filterStatus, $filterMetode) {
+        $applyFilters = function ($model) use ($keyword, $filterStatus, $filterMetode, $filterTA) {
             if ($keyword) {
                 $model->groupStart()
                       ->like('siswa.nis', $keyword)
@@ -45,6 +49,9 @@ class PembayaranController extends BaseController
             }
             if ($filterMetode) {
                 $model->where('pembayaran.metode_pembayaran', $filterMetode);
+            }
+            if ($filterTA) {
+                $model->where('tagihan.id_tahun_ajaran', $filterTA);
             }
             return $model;
         };
@@ -110,11 +117,20 @@ class PembayaranController extends BaseController
             ]);
         }
         
+        // Untuk tampilan awal: default ke tahun ajaran AKTIF kalau belum ada filter dipilih
+        $initialFilterTA = $filterTA;
+        if (!$initialFilterTA) {
+            $activeTA = $this->tahunAjaranModel->getActiveTahunAjaran();
+            if ($activeTA) $initialFilterTA = $activeTA['id_tahun_ajaran'];
+        }
+        
         $data = [
             'title' => 'Pembayaran',
             'keyword' => $keyword,
             'filter_status' => $filterStatus,
-            'filter_metode' => $filterMetode
+            'filter_metode' => $filterMetode,
+            'filter_tahun_ajaran' => $initialFilterTA,
+            'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
         ];
         
         return view('admin/pembayaran/index', $data);

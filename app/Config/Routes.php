@@ -61,6 +61,8 @@ $routes->group('admin', ['filter' => 'auth'], function($routes) {
     $routes->post('siswa/update/(:num)', 'Admin\SiswaController::update/$1');
     $routes->post('siswa/delete/(:num)', 'Admin\SiswaController::delete/$1');
     $routes->get('siswa/search', 'Admin\SiswaController::search');
+    $routes->get('siswa/import-template', 'Admin\SiswaController::importTemplate');
+    $routes->post('siswa/import', 'Admin\SiswaController::import');
     
     // Jenis Tagihan
     $routes->get('jenis-tagihan', 'Admin\JenisTagihanController::index');

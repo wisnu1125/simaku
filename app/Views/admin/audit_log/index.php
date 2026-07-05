@@ -48,10 +48,9 @@
 </div>
 
 <!-- ===================== DRAWER: Detail Log ===================== -->
-<div class="overlay" id="logDrawer_overlay" onclick="closeDrawer('logDrawer')"></div>
-<div class="drawer" id="logDrawer">
-    <div class="drawer-header"><button class="modal-close" onclick="closeDrawer('logDrawer')"><i class="fa-solid fa-arrow-left"></i></button><h3>Detail Aktivitas</h3></div>
-    <div class="drawer-body" id="drawerBody"></div>
+<div class="inline-panel" id="logPanel">
+    <div class="inline-panel-header"><button type="button" class="inline-panel-close" onclick="closePanel('logPanel')"><i class="fa-solid fa-xmark"></i></button><h3>Detail Aktivitas</h3></div>
+    <div class="inline-panel-body" id="drawerBody"></div>
 </div>
 
 <script>
@@ -145,7 +144,7 @@ document.getElementById('fSelesai').addEventListener('change', function () { fSe
 
 // ===================== DRAWER: Detail =====================
 function openDetailDrawer(id) {
-    openDrawer('logDrawer');
+    openPanel('logPanel');
     document.getElementById('drawerBody').innerHTML = '<div class="drawer-skeleton"><i class="fa-solid fa-spinner fa-spin" style="font-size:22px;"></i><span>Memuat…</span></div>';
 
     fetch(BASE_URL + '/admin/audit-log/detail/' + id, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })

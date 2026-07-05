@@ -53,6 +53,10 @@ class LaporanController extends BaseController
         $tanggalMulai = $this->request->getGet('tanggal_mulai') ?: date('Y-m-01');
         $tanggalSelesai = $this->request->getGet('tanggal_selesai') ?: date('Y-m-d');
         $idTahunAjaran = $this->request->getGet('id_tahun_ajaran');
+        if (!$idTahunAjaran) {
+            $activeTA = $this->tahunAjaranModel->getActiveTahunAjaran();
+            if ($activeTA) $idTahunAjaran = $activeTA['id_tahun_ajaran'];
+        }
         
         $builder = $this->pembayaranModel
                         ->select('pembayaran.*, 
@@ -108,6 +112,10 @@ class LaporanController extends BaseController
     public function tunggakan()
     {
         $idTahunAjaran = $this->request->getGet('id_tahun_ajaran');
+        if (!$idTahunAjaran) {
+            $activeTA = $this->tahunAjaranModel->getActiveTahunAjaran();
+            if ($activeTA) $idTahunAjaran = $activeTA['id_tahun_ajaran'];
+        }
         $idKelas = $this->request->getGet('id_kelas');
         
         $builder = $this->tagihanModel

@@ -27,11 +27,6 @@
 .pager .btns { display: flex; gap: 6px; }
 
 /* Modal form pembayaran */
-.search-box { position: relative; }
-.search-results { display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 30; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-md); max-height: 240px; overflow-y: auto; }
-.search-result-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--border-soft); font-size: 13.5px; }
-.search-result-item:last-child { border-bottom: none; }
-.search-result-item:hover { background: var(--brand-bg); }
 .selected-siswa-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--brand-bg); border: 1.5px solid var(--brand-light); border-radius: var(--r-md); padding: 14px 16px; margin-top: 10px; }
 .section-step { display: flex; align-items: center; gap: 10px; margin: 22px 0 12px; }
 .section-step:first-child { margin-top: 0; }
@@ -65,37 +60,11 @@
     <button class="btn btn-primary" onclick="openCreateModal()"><i class="fa-solid fa-plus"></i> <span class="hide-xs">Input</span></button>
 </div>
 
-<div class="stat-grid">
-    <div class="card stat-card"><div class="value" style="color:var(--success);" id="statValid">Rp 0</div><div class="label">Total Valid</div></div>
-    <div class="card stat-card"><div class="value" style="color:var(--info);" id="statCount">0</div><div class="label">Transaksi</div></div>
-    <div class="card stat-card"><div class="value" style="color:var(--danger);" id="statBatal">Rp 0</div><div class="label">Dibatalkan</div></div>
-</div>
-
-<div class="toolbar">
-    <div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input type="text" class="input" id="q" placeholder="Cari NIS, nama, atau nomor kwitansi…"></div>
-    <select class="input" id="fStatus"><option value="">Semua Status</option><option value="valid">Valid</option><option value="dibatalkan">Dibatalkan</option></select>
-    <select class="input" id="fMetode"><option value="">Semua Metode</option><option value="tunai">Tunai</option><option value="transfer">Transfer</option></select>
-</div>
-
-<div class="card" style="overflow:hidden;">
-    <div style="overflow-x:auto;">
-        <table class="data-table">
-            <thead><tr><th>Tanggal</th><th>Kwitansi</th><th>Siswa</th><th>Tagihan</th><th style="text-align:right;">Nominal</th><th>Metode</th><th>Status</th><th></th></tr></thead>
-            <tbody id="tableBody"></tbody>
-        </table>
-    </div>
-    <div class="row-list" id="cardList"></div>
-    <div id="emptyState" style="display:none;"></div>
-    <div class="pager" id="pager"></div>
-</div>
-
-<!-- ===================== MODAL: Input Pembayaran ===================== -->
-<div class="overlay" id="bayarModal_overlay" onclick="closeModal('bayarModal')"></div>
-<div class="modal modal-wide" id="bayarModal">
-    <div class="modal-drag"></div>
-    <div class="modal-header"><h3>Input Pembayaran</h3><button type="button" class="modal-close" onclick="closeModal('bayarModal')"><i class="fa-solid fa-xmark"></i></button></div>
+<!-- ===================== PANEL: Input Pembayaran (inline, bukan modal) ===================== -->
+<div class="inline-panel" id="bayarPanel">
+    <div class="inline-panel-header"><h3>Input Pembayaran</h3><button type="button" class="inline-panel-close" onclick="closePanel('bayarPanel')"><i class="fa-solid fa-xmark"></i></button></div>
     <form id="formPembayaran" action="<?= base_url('admin/pembayaran/store-bulk') ?>" method="POST">
-        <div class="modal-body">
+        <div class="inline-panel-body">
             <div class="section-step"><span class="num">1</span><span class="txt">Pilih Siswa</span></div>
             <div class="search-box">
                 <input type="text" class="input" id="siswa_search" placeholder="Ketik NIS atau nama siswa…" autocomplete="off">
@@ -131,11 +100,41 @@
                 </div>
             </div>
         </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('bayarModal')">Batal</button>
+        <div class="inline-panel-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePanel('bayarPanel')">Batal</button>
             <button type="submit" class="btn btn-primary" id="btn_submit" disabled><i class="fa-solid fa-check-double"></i> Konfirmasi Pembayaran</button>
         </div>
     </form>
+</div>
+
+<div class="stat-grid">
+    <div class="card stat-card"><div class="value" style="color:var(--success);" id="statValid">Rp 0</div><div class="label">Total Valid</div></div>
+    <div class="card stat-card"><div class="value" style="color:var(--info);" id="statCount">0</div><div class="label">Transaksi</div></div>
+    <div class="card stat-card"><div class="value" style="color:var(--danger);" id="statBatal">Rp 0</div><div class="label">Dibatalkan</div></div>
+</div>
+
+<div class="toolbar">
+    <div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input type="text" class="input" id="q" placeholder="Cari NIS, nama, atau nomor kwitansi…"></div>
+    <select class="input" id="fTA">
+        <option value="">Semua Tahun Ajaran</option>
+        <?php foreach ($tahun_ajaran as $ta): ?>
+            <option value="<?= $ta['id_tahun_ajaran'] ?>" <?= (string) $filter_tahun_ajaran === (string) $ta['id_tahun_ajaran'] ? 'selected' : '' ?>><?= esc($ta['nama_tahun_ajaran']) ?><?= $ta['status'] === 'aktif' ? ' (Aktif)' : '' ?></option>
+        <?php endforeach; ?>
+    </select>
+    <select class="input" id="fStatus"><option value="">Semua Status</option><option value="valid">Valid</option><option value="dibatalkan">Dibatalkan</option></select>
+    <select class="input" id="fMetode"><option value="">Semua Metode</option><option value="tunai">Tunai</option><option value="transfer">Transfer</option></select>
+</div>
+
+<div class="card" style="overflow:hidden;">
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead><tr><th>Tanggal</th><th>Kwitansi</th><th>Siswa</th><th>Tagihan</th><th style="text-align:right;">Nominal</th><th>Metode</th><th>Status</th><th></th></tr></thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+    <div class="row-list" id="cardList"></div>
+    <div id="emptyState" style="display:none;"></div>
+    <div class="pager" id="pager"></div>
 </div>
 
 <script>
@@ -143,7 +142,7 @@ const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
 const LIST_URL = '<?= base_url('admin/pembayaran') ?>';
 let page = 1;
 const PER_PAGE = 15;
-let q = '', fStatus = '', fMetode = '';
+let q = '', fTA = '<?= esc($filter_tahun_ajaran ?? '') ?>', fStatus = '', fMetode = '';
 let fetchToken = 0;
 
 function esc(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
@@ -166,6 +165,7 @@ async function loadPage() {
 
     const params = new URLSearchParams({ page, per_page: PER_PAGE });
     if (q) params.set('keyword', q);
+    if (fTA) params.set('filter_tahun_ajaran', fTA);
     if (fStatus) params.set('filter_status', fStatus);
     if (fMetode) params.set('filter_metode', fMetode);
 
@@ -233,6 +233,7 @@ document.getElementById('q').addEventListener('input', function () {
     clearTimeout(searchDebounce);
     searchDebounce = setTimeout(() => { q = this.value.trim(); page = 1; loadPage(); }, 350);
 });
+document.getElementById('fTA').addEventListener('change', function () { fTA = this.value; page = 1; loadPage(); });
 document.getElementById('fStatus').addEventListener('change', function () { fStatus = this.value; page = 1; loadPage(); });
 document.getElementById('fMetode').addEventListener('change', function () { fMetode = this.value; page = 1; loadPage(); });
 
@@ -248,32 +249,55 @@ function resetBayarForm() {
     document.getElementById('btn_submit').disabled = true;
     selectedTagihan = [];
 }
-function openCreateModal() { resetBayarForm(); openModal('bayarModal'); }
+function openCreateModal() { resetBayarForm(); openPanel('bayarPanel'); }
+
+// Jaga-jaga: kalau footer.php di server belum sempat diperbarui (openSearchDropdown
+// dkk. jadi belum ada), definisikan versi cadangannya di sini supaya pencarian tetap
+// berfungsi tanpa harus bergantung file lain.
+if (typeof openSearchDropdown !== 'function') {
+    window.openSearchDropdown = function (inputEl, dropdownEl, html) {
+        dropdownEl.innerHTML = html;
+        const rect = inputEl.getBoundingClientRect();
+        dropdownEl.style.position = 'fixed';
+        dropdownEl.style.left = rect.left + 'px';
+        dropdownEl.style.right = 'auto';
+        dropdownEl.style.top = (rect.bottom + 6) + 'px';
+        dropdownEl.style.width = rect.width + 'px';
+        dropdownEl.style.margin = '0';
+        dropdownEl.style.display = 'block';
+    };
+}
+if (typeof closeSearchDropdown !== 'function') {
+    window.closeSearchDropdown = function (dropdownEl) { dropdownEl.style.display = 'none'; };
+}
+if (typeof scrollIntoModal !== 'function') {
+    window.scrollIntoModal = function (el) { if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+}
 
 let searchTimeout;
 document.getElementById('siswa_search').addEventListener('input', function () {
     clearTimeout(searchTimeout);
     const keyword = this.value;
-    if (keyword.length < 2) { document.getElementById('siswa_results').style.display = 'none'; return; }
+    const inputEl = this;
+    if (keyword.length < 2) { closeSearchDropdown(document.getElementById('siswa_results')); return; }
     searchTimeout = setTimeout(() => {
         fetch(BASE_URL + '/admin/siswa/search?keyword=' + encodeURIComponent(keyword))
             .then(r => r.json())
             .then(data => {
-                const results = document.getElementById('siswa_results');
-                results.innerHTML = data.length === 0
+                const html = data.length === 0
                     ? '<div class="search-result-item" style="color:var(--faint);">Tidak ada hasil.</div>'
                     : data.map(s => `<div class="search-result-item" onclick='selectSiswaObj(${JSON.stringify(s)})'><strong>${esc(s.nama_lengkap)}</strong><br><small><i class="fa-solid fa-id-card"></i> NIS ${esc(s.nis)} · ${esc(s.nama_kelas || 'Belum dikelas')}</small></div>`).join('');
-                results.style.display = 'block';
+                openSearchDropdown(inputEl, document.getElementById('siswa_results'), html);
             });
     }, 300);
 });
-document.addEventListener('click', function (e) { if (!e.target.closest('.search-box')) document.getElementById('siswa_results').style.display = 'none'; });
+document.addEventListener('click', function (e) { if (!e.target.closest('.search-box') && !e.target.closest('#siswa_results')) closeSearchDropdown(document.getElementById('siswa_results')); });
 
 function selectSiswaObj(siswa) {
     selectedTagihan = [];
     document.getElementById('id_siswa').value = siswa.id_siswa;
     document.getElementById('siswa_search').value = '';
-    document.getElementById('siswa_results').style.display = 'none';
+    closeSearchDropdown(document.getElementById('siswa_results'));
     document.getElementById('selected_siswa').innerHTML = `
         <div class="selected-siswa-box">
             <div><strong>${esc(siswa.nama_lengkap)}</strong><br><small><i class="fa-solid fa-id-card"></i> NIS ${esc(siswa.nis)}</small></div>
@@ -303,6 +327,7 @@ function loadTagihanUntukBayar(idSiswa) {
             if (data.length === 0) {
                 tagihanList.innerHTML = '<div class="empty-state"><i class="fa-solid fa-circle-check"></i><p>Tidak ada tagihan yang belum lunas.</p></div>';
                 document.getElementById('tagihan_section').style.display = 'block';
+                setTimeout(() => scrollIntoModal(document.getElementById('tagihan_section')), 50);
                 return;
             }
 
@@ -329,6 +354,7 @@ function loadTagihanUntukBayar(idSiswa) {
 
             document.getElementById('tagihan_section').style.display = 'block';
             document.getElementById('pembayaran_section').style.display = 'block';
+            setTimeout(() => scrollIntoModal(document.getElementById('tagihan_section')), 50);
         });
 }
 
@@ -375,14 +401,14 @@ document.getElementById('formPembayaran').addEventListener('submit', function (e
     if (selectedTagihan.length === 0) { e.preventDefault(); alert('Pilih minimal 1 tagihan untuk dibayar.'); }
 });
 
-// ===================== Buka modal otomatis dari hash (link lama / tombol "Bayar" di drawer Siswa) =====================
+// ===================== Buka panel otomatis dari hash (link lama / tombol "Bayar" di drawer Siswa) =====================
 function handleHash() {
     const h = location.hash;
     if (h === '#bayar') { openCreateModal(); }
     else if (h.startsWith('#bayar-')) {
         const idSiswa = h.replace('#bayar-', '');
         resetBayarForm();
-        openModal('bayarModal');
+        openPanel('bayarPanel');
         fetch(BASE_URL + '/admin/siswa/detail/' + idSiswa, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(r => r.json())
             .then(data => { if (data.siswa) selectSiswaObj(data.siswa); });

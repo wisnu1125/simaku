@@ -26,7 +26,7 @@
 
 <div class="toolbar">
     <div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input type="text" class="input" id="q" placeholder="Cari nama, NIS, atau nama beasiswa…"></div>
-    <select class="input" id="fTA"><option value="">Semua Tahun Ajaran</option><?php foreach ($tahun_ajaran as $ta): ?><option value="<?= $ta['id_tahun_ajaran'] ?>"><?= esc($ta['nama_tahun_ajaran']) ?></option><?php endforeach; ?></select>
+    <select class="input" id="fTA"><option value="">Semua Tahun Ajaran</option><?php foreach ($tahun_ajaran as $ta): ?><option value="<?= $ta['id_tahun_ajaran'] ?>" <?= (string) ($filter_tahun_ajaran ?? '') === (string) $ta['id_tahun_ajaran'] ? 'selected' : '' ?>><?= esc($ta['nama_tahun_ajaran']) ?><?= $ta['status'] === 'aktif' ? ' (Aktif)' : '' ?></option><?php endforeach; ?></select>
 </div>
 
 <div class="card" style="overflow:hidden;">
@@ -42,13 +42,11 @@
 </div>
 
 <!-- ===================== MODAL: Tambah / Edit ===================== -->
-<div class="overlay" id="bsModal_overlay" onclick="closeModal('bsModal')"></div>
-<div class="modal modal-wide" id="bsModal">
-    <div class="modal-drag"></div>
-    <div class="modal-header"><h3 id="bsModalTitle">Tambah Beasiswa</h3><button type="button" class="modal-close" onclick="closeModal('bsModal')"><i class="fa-solid fa-xmark"></i></button></div>
+<div class="inline-panel" id="bsPanel">
+    <div class="inline-panel-header"><h3 id="bsModalTitle">Tambah Beasiswa</h3><button type="button" class="inline-panel-close" onclick="closePanel('bsPanel')"><i class="fa-solid fa-xmark"></i></button></div>
     <form id="bsForm" action="<?= base_url('admin/beasiswa/store') ?>" method="POST">
         <input type="hidden" name="editing_id" id="f_editing_id" value="<?= esc(old('editing_id', '')) ?>">
-        <div class="modal-body">
+        <div class="inline-panel-body">
 
             <div class="field" id="f_mode_wrap">
                 <label class="required">Mode</label>
@@ -61,9 +59,9 @@
 
             <div class="field">
                 <label class="required">Cari Siswa</label>
-                <div class="search-box" style="position:relative;">
+                <div class="search-box">
                     <input type="text" class="input" id="f_siswa_search" placeholder="Ketik NIS atau nama…" autocomplete="off">
-                    <div class="search-results" id="f_siswa_results" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:30; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--shadow-md); max-height:200px; overflow-y:auto;"></div>
+                    <div class="search-results" id="f_siswa_results"></div>
                 </div>
                 <input type="hidden" name="id_siswa" id="f_id_siswa" required>
                 <div id="f_selected_siswa" style="margin-top:8px;"></div>
@@ -132,8 +130,8 @@
                 <textarea class="input" name="keterangan" id="f_ket" rows="2"><?= esc(old('keterangan', '')) ?></textarea>
             </div>
         </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('bsModal')">Batal</button>
+        <div class="inline-panel-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePanel('bsPanel')">Batal</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Simpan</button>
         </div>
     </form>
@@ -144,7 +142,7 @@ const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
 const LIST_URL = '<?= base_url('admin/beasiswa') ?>';
 let page = 1;
 const PER_PAGE = 15;
-let q = '', fTA = '';
+let q = '', fTA = '<?= esc($filter_tahun_ajaran ?? '') ?>';
 let currentRows = [];
 let fetchToken = 0;
 
@@ -252,7 +250,7 @@ function openCreateModal() {
     document.getElementById('f_mode_wrap').style.display = 'block';
     document.getElementById('f_status_wrap').style.display = 'none';
     document.getElementById('f_status').removeAttribute('required');
-    openModal('bsModal');
+    openPanel('bsPanel');
 }
 
 function openEditModal(id) {
@@ -285,33 +283,54 @@ function openEditModal(id) {
     document.getElementById('f_status').setAttribute('required', 'required');
     document.getElementById('f_status').value = b.status;
 
-    openModal('bsModal');
+    openPanel('bsPanel');
+}
+
+if (typeof openSearchDropdown !== 'function') {
+    window.openSearchDropdown = function (inputEl, dropdownEl, html) {
+        dropdownEl.innerHTML = html;
+        const rect = inputEl.getBoundingClientRect();
+        dropdownEl.style.position = 'fixed';
+        dropdownEl.style.left = rect.left + 'px';
+        dropdownEl.style.right = 'auto';
+        dropdownEl.style.top = (rect.bottom + 6) + 'px';
+        dropdownEl.style.width = rect.width + 'px';
+        dropdownEl.style.margin = '0';
+        dropdownEl.style.display = 'block';
+    };
+}
+if (typeof closeSearchDropdown !== 'function') {
+    window.closeSearchDropdown = function (dropdownEl) { dropdownEl.style.display = 'none'; };
+}
+if (typeof scrollIntoModal !== 'function') {
+    window.scrollIntoModal = function (el) { if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
 }
 
 let sSearchTimeout;
 document.getElementById('f_siswa_search').addEventListener('input', function () {
     clearTimeout(sSearchTimeout);
     const keyword = this.value;
-    if (keyword.length < 2) { document.getElementById('f_siswa_results').style.display = 'none'; return; }
+    const inputEl = this;
+    if (keyword.length < 2) { closeSearchDropdown(document.getElementById('f_siswa_results')); return; }
     sSearchTimeout = setTimeout(() => {
         fetch(BASE_URL + '/admin/siswa/search?keyword=' + encodeURIComponent(keyword))
             .then(r => r.json())
             .then(data => {
-                const results = document.getElementById('f_siswa_results');
-                results.innerHTML = data.length === 0
-                    ? '<div class="search-result-item" style="padding:12px 16px; color:var(--faint);">Tidak ada hasil.</div>'
-                    : data.map(s => `<div class="search-result-item" style="padding:12px 16px; cursor:pointer; border-bottom:1px solid var(--border-soft);" onclick='fSelectSiswa(${JSON.stringify(s)})'><strong>${esc(s.nama_lengkap)}</strong><br><small style="color:var(--muted);">NIS ${esc(s.nis)} · ${esc(s.nama_kelas || 'Belum dikelas')}</small></div>`).join('');
-                results.style.display = 'block';
+                const html = data.length === 0
+                    ? '<div class="search-result-item" style="color:var(--faint);">Tidak ada hasil.</div>'
+                    : data.map(s => `<div class="search-result-item" onclick='fSelectSiswa(${JSON.stringify(s)})'><strong>${esc(s.nama_lengkap)}</strong><br><small style="color:var(--muted);">NIS ${esc(s.nis)} · ${esc(s.nama_kelas || 'Belum dikelas')}</small></div>`).join('');
+                openSearchDropdown(inputEl, document.getElementById('f_siswa_results'), html);
             });
     }, 300);
 });
 function fSelectSiswa(s) {
     document.getElementById('f_id_siswa').value = s.id_siswa;
     document.getElementById('f_siswa_search').value = '';
-    document.getElementById('f_siswa_results').style.display = 'none';
+    closeSearchDropdown(document.getElementById('f_siswa_results'));
     document.getElementById('f_selected_siswa').innerHTML = `<div class="selected-siswa-box" style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--brand-bg); border:1.5px solid var(--brand-light); border-radius:var(--r-md); padding:10px 14px;"><div><strong>${esc(s.nama_lengkap)}</strong><br><small>NIS ${esc(s.nis)}</small></div><button type="button" class="icon-action danger" onclick="document.getElementById('f_id_siswa').value=''; document.getElementById('f_selected_siswa').innerHTML='';"><i class="fa-solid fa-xmark"></i></button></div>`;
+    scrollIntoModal(document.getElementById('f_selected_siswa'));
 }
-document.addEventListener('click', function (e) { if (!e.target.closest('.search-box')) document.getElementById('f_siswa_results').style.display = 'none'; });
+document.addEventListener('click', function (e) { if (!e.target.closest('.search-box') && !e.target.closest('#f_siswa_results')) closeSearchDropdown(document.getElementById('f_siswa_results')); });
 
 function handleHash() {
     const h = location.hash;

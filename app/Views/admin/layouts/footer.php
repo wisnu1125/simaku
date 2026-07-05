@@ -86,6 +86,33 @@ function confirmDelete(message) {
     return confirm(message || 'Apakah Anda yakin ingin menghapus data ini?');
 }
 
+// ---------- Dropdown pencarian (cari siswa, dsb) ----------
+// Sekarang cukup toggle display saja -- posisinya sudah ditangani CSS (position:absolute
+// relatif ke .search-box), karena formnya tidak lagi di dalam modal yang overflow:auto.
+function openSearchDropdown(inputEl, dropdownEl, html) {
+    dropdownEl.innerHTML = html;
+    dropdownEl.style.display = 'block';
+}
+function closeSearchDropdown(dropdownEl) {
+    dropdownEl.style.display = 'none';
+}
+
+// ---------- Scroll halus ke bagian yang baru muncul (mis. setelah pilih siswa) ----------
+function scrollIntoModal(el) {
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ---------- Panel inline (pengganti modal) ----------
+function openPanel(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('open');
+    setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+}
+function closePanel(id) {
+    document.getElementById(id)?.classList.remove('open');
+}
+
 // ---------- Format Rupiah ----------
 function formatRupiah(angka, prefix = 'Rp ') {
     const number_string = angka.toString().replace(/[^,\d]/g, '');

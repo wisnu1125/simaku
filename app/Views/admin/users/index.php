@@ -16,13 +16,11 @@
 </div>
 
 <!-- ===================== MODAL: Tambah / Edit ===================== -->
-<div class="overlay" id="userModal_overlay" onclick="closeModal('userModal')"></div>
-<div class="modal" id="userModal">
-    <div class="modal-drag"></div>
-    <div class="modal-header"><h3 id="userModalTitle">Tambah User</h3><button type="button" class="modal-close" onclick="closeModal('userModal')"><i class="fa-solid fa-xmark"></i></button></div>
+<div class="inline-panel" id="userPanel">
+    <div class="inline-panel-header"><h3 id="userModalTitle">Tambah User</h3><button type="button" class="inline-panel-close" onclick="closePanel('userPanel')"><i class="fa-solid fa-xmark"></i></button></div>
     <form id="userForm" action="<?= base_url('admin/users/store') ?>" method="POST">
         <input type="hidden" name="editing_id" id="f_editing_id" value="<?= esc(old('editing_id', '')) ?>">
-        <div class="modal-body">
+        <div class="inline-panel-body">
             <div class="field">
                 <label class="required">Nama Lengkap</label>
                 <input class="input" name="nama_lengkap" id="f_nama" value="<?= esc(old('nama_lengkap', '')) ?>" required>
@@ -66,8 +64,8 @@
                 </div>
             </div>
         </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Batal</button>
+        <div class="inline-panel-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePanel('userPanel')">Batal</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Simpan</button>
         </div>
     </form>
@@ -126,7 +124,7 @@ function openCreateModal() {
     document.getElementById('f_password_label').textContent = 'Password';
     document.getElementById('f_status_wrap').style.display = 'none';
     document.getElementById('f_status').removeAttribute('required');
-    openModal('userModal');
+    openPanel('userPanel');
 }
 
 function openEditModal(id) {
@@ -150,7 +148,7 @@ function openEditModal(id) {
     document.getElementById('f_status').setAttribute('required', 'required');
     document.getElementById('f_status').value = u.status;
 
-    openModal('userModal');
+    openPanel('userPanel');
 }
 
 function handleHash() {
@@ -175,7 +173,7 @@ if (HAS_ERRORS) {
         document.getElementById('f_password').setAttribute('required', 'required');
         document.getElementById('f_password_confirm').setAttribute('required', 'required');
     }
-    openModal('userModal');
+    openPanel('userPanel');
 } else if (location.hash) {
     handleHash();
 }

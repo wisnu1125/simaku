@@ -17,14 +17,12 @@
 <div class="ta-list" id="taList"></div>
 <div id="emptyState" style="display:none;"></div>
 
-<!-- ===================== MODAL: Tambah / Edit ===================== -->
-<div class="overlay" id="taModal_overlay" onclick="closeModal('taModal')"></div>
-<div class="modal" id="taModal">
-    <div class="modal-drag"></div>
-    <div class="modal-header"><h3 id="taModalTitle">Tambah Tahun Ajaran</h3><button type="button" class="modal-close" onclick="closeModal('taModal')"><i class="fa-solid fa-xmark"></i></button></div>
+<!-- ===================== PANEL: Tambah / Edit (inline) ===================== -->
+<div class="inline-panel" id="taPanel">
+    <div class="inline-panel-header"><h3 id="taModalTitle">Tambah Tahun Ajaran</h3><button type="button" class="inline-panel-close" onclick="closePanel('taPanel')"><i class="fa-solid fa-xmark"></i></button></div>
     <form id="taForm" action="<?= base_url('admin/tahun-ajaran/store') ?>" method="POST">
         <input type="hidden" name="editing_id" id="f_editing_id" value="<?= esc(old('editing_id', '')) ?>">
-        <div class="modal-body">
+        <div class="inline-panel-body">
             <div class="field">
                 <label class="required">Nama Tahun Ajaran</label>
                 <input class="input <?= isset($errors['nama_tahun_ajaran']) ? 'is-invalid' : '' ?>" name="nama_tahun_ajaran" id="f_nama" placeholder="Contoh: TA 2026/2027" value="<?= esc(old('nama_tahun_ajaran', '')) ?>" required>
@@ -40,13 +38,13 @@
                     <input type="date" class="input" name="tanggal_selesai" id="f_selesai" value="<?= esc(old('tanggal_selesai', '')) ?>" required>
                 </div>
             </div>
-            <label style="display:flex; align-items:flex-start; gap:10px; padding:14px; background:var(--brand-bg); border:1.5px solid var(--brand-light); border-radius:var(--r-md); cursor:pointer;">
+            <label style="display:flex; align-items:flex-start; gap:10px; padding:14px; background:#fff; border:1.5px solid var(--brand-light); border-radius:var(--r-md); cursor:pointer;">
                 <input type="checkbox" name="set_aktif" id="f_set_aktif" value="1" style="width:18px; height:18px; accent-color:var(--brand); margin-top:1px;">
                 <span style="font-size:13px; color:var(--brand-darker);"><strong id="f_set_aktif_label">Jadikan tahun ajaran aktif</strong><br><span style="font-size:11.5px;">Tahun ajaran aktif lain otomatis ditandai selesai.</span></span>
             </label>
         </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('taModal')">Batal</button>
+        <div class="inline-panel-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePanel('taPanel')">Batal</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Simpan</button>
         </div>
     </form>
@@ -99,7 +97,7 @@ function openCreateModal() {
     document.getElementById('taModalTitle').textContent = 'Tambah Tahun Ajaran';
     document.getElementById('taForm').action = BASE_URL + '/admin/tahun-ajaran/store';
     document.getElementById('f_set_aktif_label').textContent = 'Jadikan tahun ajaran aktif';
-    openModal('taModal');
+    openPanel('taPanel');
 }
 
 function openEditModal(id) {
@@ -114,7 +112,7 @@ function openEditModal(id) {
     document.getElementById('f_selesai').value = t.tanggal_selesai;
     document.getElementById('f_set_aktif_label').textContent = t.status === 'aktif' ? 'Tetap aktifkan tahun ajaran ini' : 'Jadikan tahun ajaran aktif';
     document.getElementById('f_set_aktif').checked = t.status === 'aktif';
-    openModal('taModal');
+    openPanel('taPanel');
 }
 
 function handleHash() {
@@ -132,7 +130,7 @@ if (HAS_ERRORS) {
     } else {
         document.getElementById('taForm').action = BASE_URL + '/admin/tahun-ajaran/store';
     }
-    openModal('taModal');
+    openPanel('taPanel');
 } else if (location.hash) {
     handleHash();
 }

@@ -38,78 +38,21 @@
         <div class="page-title">Data Siswa</div>
         <div class="page-subtitle" id="resultCount">Memuat…</div>
     </div>
-    <button class="btn btn-primary" onclick="openCreateModal()"><i class="fa-solid fa-plus"></i> <span class="hide-xs">Tambah Siswa</span></button>
-</div>
-
-<div class="stat-grid">
-    <div class="card stat-card">
-        <div class="value" id="statTotal">0</div>
-        <div class="label">Total</div>
-    </div>
-    <div class="card stat-card">
-        <div class="value" style="color:var(--success);" id="statAktif">0</div>
-        <div class="label">Aktif</div>
-    </div>
-    <div class="card stat-card">
-        <div class="value" style="color:var(--info);" id="statLulus">0</div>
-        <div class="label">Lulus</div>
+    <div style="display:flex; gap:8px;">
+        <button class="btn btn-secondary" onclick="openImportModal()"><i class="fa-solid fa-file-arrow-up"></i> <span class="hide-xs">Impor Excel</span></button>
+        <button class="btn btn-primary" onclick="openCreateModal()"><i class="fa-solid fa-plus"></i> <span class="hide-xs">Tambah Siswa</span></button>
     </div>
 </div>
 
-<div class="toolbar">
-    <div class="search-wrap">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" class="input" id="q" placeholder="Cari nama, NIS, atau VA…">
-    </div>
-    <select class="input" id="fKelas">
-        <option value="">Semua Kelas</option>
-        <?php foreach ($kelas_list as $k): ?>
-            <option value="<?= esc($k['nama_kelas']) ?>"><?= esc($k['nama_kelas']) ?></option>
-        <?php endforeach; ?>
-    </select>
-    <select class="input" id="fStatus">
-        <option value="">Semua Status</option>
-        <option value="aktif">Aktif</option>
-        <option value="nonaktif">Nonaktif</option>
-        <option value="lulus">Lulus</option>
-    </select>
-</div>
-
-<!-- Desktop table -->
-<div class="card" style="overflow:hidden;">
-    <div style="overflow-x:auto;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>NIS</th>
-                    <th>Nama Lengkap</th>
-                    <th>Kelas</th>
-                    <th>Virtual Account</th>
-                    <th>Status</th>
-                    <th style="text-align:right;">Aksi</th>
-                </tr>
-            </thead>
-            <tbody id="tableBody"></tbody>
-        </table>
-    </div>
-    <!-- Mobile card list -->
-    <div class="row-list" id="cardList" style="padding:10px;"></div>
-
-    <div id="emptyState" style="display:none;"></div>
-    <div class="pager" id="pager"></div>
-</div>
-
-<!-- ===================== MODAL: Tambah / Edit Siswa ===================== -->
-<div class="overlay" id="siswaModal_overlay" onclick="closeModal('siswaModal')"></div>
-<div class="modal modal-wide" id="siswaModal">
-    <div class="modal-drag"></div>
-    <div class="modal-header">
+<!-- ===================== PANEL: Tambah / Edit Siswa (inline) ===================== -->
+<div class="inline-panel" id="siswaPanel">
+    <div class="inline-panel-header">
         <h3 id="siswaModalTitle">Tambah Siswa</h3>
-        <button type="button" class="modal-close" onclick="closeModal('siswaModal')"><i class="fa-solid fa-xmark"></i></button>
+        <button type="button" class="inline-panel-close" onclick="closePanel('siswaPanel')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <form id="siswaForm" action="<?= base_url('admin/siswa/store') ?>" method="POST">
         <input type="hidden" name="editing_id" id="f_editing_id" value="<?= esc(old('editing_id', '')) ?>">
-        <div class="modal-body">
+        <div class="inline-panel-body">
 
             <div class="eyebrow" style="margin-bottom:10px;">Identitas Siswa</div>
             <div class="field-row">
@@ -187,27 +130,140 @@
                     <input class="input" name="virtual_account" id="f_va" placeholder="Klik Generate atau isi manual" value="<?= esc(old('virtual_account', '')) ?>">
                     <button type="button" class="btn btn-secondary" id="f_va_btn" onclick="generateVA()"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
                 </div>
-                <div class="va-hint">Format otomatis: 88 + 10 digit NIS. Kosongkan saat tambah baru untuk generate otomatis.</div>
+                <div class="va-hint">Boleh sama dengan siswa lain. Kosongkan saat tambah baru untuk generate otomatis.</div>
             </div>
 
         </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('siswaModal')">Batal</button>
+        <div class="inline-panel-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePanel('siswaPanel')">Batal</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Simpan</button>
         </div>
     </form>
 </div>
 
-<!-- ===================== DRAWER: Detail Siswa ===================== -->
-<div class="overlay" id="siswaDrawer_overlay" onclick="closeDrawer('siswaDrawer')"></div>
-<div class="drawer" id="siswaDrawer">
-    <div class="drawer-header">
-        <button class="modal-close" onclick="closeDrawer('siswaDrawer')"><i class="fa-solid fa-arrow-left"></i></button>
+<!-- ===================== MODAL: Impor Excel ===================== -->
+<div class="inline-panel" id="importPanel">
+    <div class="inline-panel-header"><h3>Impor Data Siswa</h3><button type="button" class="inline-panel-close" onclick="closePanel('importPanel')"><i class="fa-solid fa-xmark"></i></button></div>
+
+    <?php if (!empty($import_result)): ?>
+        <div class="inline-panel-body">
+            <div class="hint-box" style="background:<?= $import_result['success_count'] > 0 ? 'var(--success-bg)' : 'var(--warning-bg)' ?>; border:1px solid <?= $import_result['success_count'] > 0 ? 'var(--success-border)' : 'var(--warning-border)' ?>; border-radius:var(--r-md); padding:14px 16px; margin-bottom:16px; display:flex; gap:10px; align-items:flex-start;">
+                <i class="fa-solid fa-<?= $import_result['success_count'] > 0 ? 'circle-check' : 'triangle-exclamation' ?>" style="margin-top:2px; color:<?= $import_result['success_count'] > 0 ? 'var(--success)' : 'var(--warning)' ?>;"></i>
+                <span style="font-size:13px;"><strong><?= (int) $import_result['success_count'] ?> dari <?= (int) $import_result['total_rows'] ?> baris</strong> berhasil diimpor.</span>
+            </div>
+
+            <?php if (!empty($import_result['errors'])): ?>
+                <div class="eyebrow" style="margin-bottom:8px;">Catatan (<?= count($import_result['errors']) ?>)</div>
+                <div class="card" style="max-height:280px; overflow-y:auto; padding:4px 16px;">
+                    <?php foreach ($import_result['errors'] as $err): ?>
+                        <div style="padding:10px 0; border-bottom:1px solid var(--border-soft); font-size:12.5px; color:var(--body);"><?= esc($err) ?></div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+        <div class="inline-panel-footer">
+            <button type="button" class="btn btn-secondary" onclick="resetImportModal()"><i class="fa-solid fa-rotate-left"></i> Impor Lagi</button>
+            <button type="button" class="btn btn-primary" onclick="closePanel('importPanel'); loadPage();">Selesai</button>
+        </div>
+    <?php else: ?>
+        <form id="importForm" action="<?= base_url('admin/siswa/import') ?>" method="POST" enctype="multipart/form-data">
+            <div class="inline-panel-body">
+                <div class="hint-box" style="background:var(--brand-bg); border:1px solid var(--brand-light); border-radius:var(--r-md); padding:14px 16px; margin-bottom:18px; display:flex; gap:10px; align-items:flex-start;">
+                    <i class="fa-solid fa-circle-info" style="margin-top:1px;"></i>
+                    <span style="font-size:12.5px; color:var(--brand-darker);">Unduh template dulu, isi datanya, baru unggah lagi ke sini. Kolom bertanda <strong>*</strong> wajib diisi. Baris yang bermasalah akan dilewati dan dilaporkan — baris lain yang benar tetap tersimpan.</span>
+                </div>
+
+                <a href="<?= base_url('admin/siswa/import-template') ?>" class="btn btn-secondary btn-block" style="margin-bottom:18px;"><i class="fa-solid fa-file-excel" style="color:var(--success);"></i> Unduh Template Excel</a>
+
+                <div class="field">
+                    <label class="required">File Excel</label>
+                    <input type="file" class="input" name="file" id="importFile" accept=".xlsx,.xls" required>
+                    <div class="field-hint">Format .xlsx atau .xls, sesuai kolom pada template.</div>
+                </div>
+            </div>
+            <div class="inline-panel-footer">
+                <button type="button" class="btn btn-secondary" onclick="closePanel('importPanel')">Batal</button>
+                <button type="submit" class="btn btn-primary" id="importSubmitBtn"><i class="fa-solid fa-file-arrow-up"></i> Impor Sekarang</button>
+            </div>
+        </form>
+    <?php endif; ?>
+</div>
+
+<!-- ===================== PANEL: Detail Siswa (inline, pengganti drawer) ===================== -->
+<div class="inline-panel" id="siswaDetailPanel">
+    <div class="inline-panel-header">
         <h3>Detail Siswa</h3>
+        <button type="button" class="inline-panel-close" onclick="closePanel('siswaDetailPanel')"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <div class="drawer-body" id="drawerBody">
+    <div class="inline-panel-body" id="drawerBody">
         <div class="drawer-skeleton"><i class="fa-solid fa-spinner fa-spin" style="font-size:22px;"></i><span>Memuat…</span></div>
     </div>
+</div>
+
+
+
+<div class="stat-grid">
+    <div class="card stat-card">
+        <div class="value" id="statTotal">0</div>
+        <div class="label">Total</div>
+    </div>
+    <div class="card stat-card">
+        <div class="value" style="color:var(--success);" id="statAktif">0</div>
+        <div class="label">Aktif</div>
+    </div>
+    <div class="card stat-card">
+        <div class="value" style="color:var(--info);" id="statLulus">0</div>
+        <div class="label">Lulus</div>
+    </div>
+</div>
+
+<div class="toolbar">
+    <div class="search-wrap">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" class="input" id="q" placeholder="Cari nama, NIS, atau VA…">
+    </div>
+    <select class="input" id="fTA">
+        <option value="">Semua Tahun Ajaran</option>
+        <?php foreach ($tahun_ajaran as $ta): ?>
+            <option value="<?= $ta['id_tahun_ajaran'] ?>"><?= esc($ta['nama_tahun_ajaran']) ?><?= $ta['status'] === 'aktif' ? ' (Aktif)' : '' ?></option>
+        <?php endforeach; ?>
+    </select>
+    <select class="input" id="fKelas">
+        <option value="">Semua Kelas</option>
+        <?php foreach ($kelas_list as $k): ?>
+            <option value="<?= esc($k['nama_kelas']) ?>"><?= esc($k['nama_kelas']) ?></option>
+        <?php endforeach; ?>
+    </select>
+    <select class="input" id="fStatus">
+        <option value="">Semua Status</option>
+        <option value="aktif">Aktif</option>
+        <option value="nonaktif">Nonaktif</option>
+        <option value="lulus">Lulus</option>
+    </select>
+</div>
+
+<!-- Desktop table -->
+<div class="card" style="overflow:hidden;">
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>NIS</th>
+                    <th>Nama Lengkap</th>
+                    <th>Kelas</th>
+                    <th>Virtual Account</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+    <!-- Mobile card list -->
+    <div class="row-list" id="cardList" style="padding:10px;"></div>
+
+    <div id="emptyState" style="display:none;"></div>
+    <div class="pager" id="pager"></div>
 </div>
 
 <script>
@@ -215,10 +271,11 @@ const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
 const LIST_URL = '<?= base_url('admin/siswa') ?>';
 const HAS_ERRORS = <?= !empty($errors) ? 'true' : 'false' ?>;
 const OLD_EDITING_ID = <?= json_encode(old('editing_id', ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+const TAHUN_AJARAN = <?= json_encode($tahun_ajaran, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
 let page = 1;
 const PER_PAGE = 12;
-let q = '', fKelas = '', fStatus = '';
+let q = '', fTA = '', fKelas = '', fStatus = '';
 let currentRows = [];
 let fetchToken = 0;
 
@@ -246,6 +303,7 @@ async function loadPage() {
 
     const params = new URLSearchParams({ page, per_page: PER_PAGE });
     if (q) params.set('q', q);
+    if (fTA) params.set('ta', fTA);
     if (fKelas) params.set('kelas', fKelas);
     if (fStatus) params.set('status', fStatus);
 
@@ -333,6 +391,7 @@ document.getElementById('q').addEventListener('input', function () {
     clearTimeout(searchDebounce);
     searchDebounce = setTimeout(() => { q = this.value.trim(); page = 1; loadPage(); }, 350);
 });
+document.getElementById('fTA').addEventListener('change', function () { fTA = this.value; page = 1; loadPage(); });
 document.getElementById('fKelas').addEventListener('change', function () { fKelas = this.value; page = 1; loadPage(); });
 document.getElementById('fStatus').addEventListener('change', function () { fStatus = this.value; page = 1; loadPage(); });
 
@@ -349,7 +408,7 @@ function openCreateModal() {
     document.getElementById('f_status_wrap').style.display = 'none';
     document.getElementById('f_status_siswa').removeAttribute('required');
     document.getElementById('f_va_btn').style.display = 'inline-flex';
-    openModal('siswaModal');
+    openPanel('siswaPanel');
 }
 
 function fillEditForm(s) {
@@ -374,7 +433,7 @@ function fillEditForm(s) {
     document.getElementById('f_status_siswa').value = s.status_siswa || 'aktif';
     document.getElementById('f_va_btn').style.display = 'none';
 
-    openModal('siswaModal');
+    openPanel('siswaPanel');
 }
 
 function openEditModal(id) {
@@ -405,7 +464,7 @@ function hapusSiswa(id, nama) {
 
 // ===================== DRAWER: Detail =====================
 function openDetailDrawer(id) {
-    openDrawer('siswaDrawer');
+    openPanel('siswaDetailPanel');
     document.getElementById('drawerBody').innerHTML = '<div class="drawer-skeleton"><i class="fa-solid fa-spinner fa-spin" style="font-size:22px;"></i><span>Memuat…</span></div>';
 
     fetch(BASE_URL + '/admin/siswa/detail/' + id, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
@@ -436,7 +495,7 @@ function renderDrawer(data) {
         </div>
 
         <div class="card" style="padding:14px; margin-bottom:16px; display:flex; gap:10px;">
-            <button class="btn btn-primary btn-block btn-sm" onclick="closeDrawer('siswaDrawer'); openEditModal(${s.id_siswa});"><i class="fa-solid fa-pencil"></i> Edit</button>
+            <button class="btn btn-primary btn-block btn-sm" onclick="closePanel('siswaDetailPanel'); openEditModal(${s.id_siswa});"><i class="fa-solid fa-pencil"></i> Edit</button>
             <a class="btn btn-secondary btn-block btn-sm" href="${BASE_URL}/admin/pembayaran#bayar-${s.id_siswa}"><i class="fa-solid fa-wallet"></i> Bayar</a>
         </div>
 
@@ -474,17 +533,48 @@ function renderDrawer(data) {
     document.getElementById('drawerBody').innerHTML = html;
 }
 
+// ===================== MODAL: Impor Excel =====================
+const HAS_IMPORT_RESULT = <?= !empty($import_result) ? 'true' : 'false' ?>;
+
+function openImportModal() { openPanel('importPanel'); }
+function resetImportModal() {
+    // Hasil impor sebelumnya cuma tampil sekali (flashdata session) -- reload halaman
+    // supaya modal kebuka lagi (hash #impor masih ada di address bar) tapi kali ini
+    // menampilkan form unggah yang bersih karena flashdata sudah kadaluarsa.
+    window.location.reload();
+}
+
+const importFormEl = document.getElementById('importForm');
+if (importFormEl) {
+    importFormEl.addEventListener('submit', function () {
+        const btn = document.getElementById('importSubmitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses…';
+    });
+}
+
 // ===================== Buka otomatis dari hash / error validasi =====================
 function handleHash() {
     const h = location.hash;
     if (h === '#tambah') { openCreateModal(); }
     else if (h.startsWith('#edit-')) { openEditModal(parseInt(h.replace('#edit-', ''), 10)); }
     else if (h.startsWith('#detail-')) { openDetailDrawer(parseInt(h.replace('#detail-', ''), 10)); }
+    else if (h === '#impor') { openImportModal(); }
+}
+
+// Default: tampilkan siswa dari tahun ajaran yang sedang aktif dulu (kalau ada).
+// Pengguna tetap bisa ganti ke "Semua Tahun Ajaran" atau tahun lain lewat dropdown.
+const activeTA = TAHUN_AJARAN.find(t => t.status === 'aktif');
+if (activeTA) {
+    fTA = String(activeTA.id_tahun_ajaran);
+    document.getElementById('fTA').value = fTA;
 }
 
 loadPage();
 
-if (HAS_ERRORS) {
+if (HAS_IMPORT_RESULT) {
+    openImportModal();
+} else if (HAS_ERRORS) {
     // Form baru saja ditolak validasi -> field-field sudah keisi ulang oleh PHP (old()) di HTML,
     // di sini cukup buka modalnya di mode yang sesuai (tidak perlu reset/lookup data lagi).
     if (OLD_EDITING_ID) {
@@ -498,7 +588,7 @@ if (HAS_ERRORS) {
         document.getElementById('siswaForm').action = BASE_URL + '/admin/siswa/store';
         document.getElementById('f_va_btn').style.display = 'inline-flex';
     }
-    openModal('siswaModal');
+    openPanel('siswaPanel');
 } else if (location.hash) {
     handleHash();
 }

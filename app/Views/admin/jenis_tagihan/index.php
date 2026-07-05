@@ -26,13 +26,11 @@
 </div>
 
 <!-- ===================== MODAL: Tambah / Edit ===================== -->
-<div class="overlay" id="jtModal_overlay" onclick="closeModal('jtModal')"></div>
-<div class="modal" id="jtModal">
-    <div class="modal-drag"></div>
-    <div class="modal-header"><h3 id="jtModalTitle">Tambah Jenis Tagihan</h3><button type="button" class="modal-close" onclick="closeModal('jtModal')"><i class="fa-solid fa-xmark"></i></button></div>
+<div class="inline-panel" id="jtPanel">
+    <div class="inline-panel-header"><h3 id="jtModalTitle">Tambah Jenis Tagihan</h3><button type="button" class="inline-panel-close" onclick="closePanel('jtPanel')"><i class="fa-solid fa-xmark"></i></button></div>
     <form id="jtForm" action="<?= base_url('admin/jenis-tagihan/store') ?>" method="POST">
         <input type="hidden" name="editing_id" id="f_editing_id" value="<?= esc(old('editing_id', '')) ?>">
-        <div class="modal-body">
+        <div class="inline-panel-body">
             <div class="field">
                 <label class="required">Nama Tagihan</label>
                 <input class="input" name="nama_tagihan" id="f_nama" placeholder="Contoh: SPP Juli" value="<?= esc(old('nama_tagihan', '')) ?>" required>
@@ -68,8 +66,8 @@
                 </select>
             </div>
         </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('jtModal')">Batal</button>
+        <div class="inline-panel-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePanel('jtPanel')">Batal</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Simpan</button>
         </div>
     </form>
@@ -142,7 +140,7 @@ function openCreateModal() {
     document.getElementById('jtForm').action = BASE_URL + '/admin/jenis-tagihan/store';
     document.getElementById('f_status_wrap').style.display = 'none';
     document.getElementById('f_status').removeAttribute('required');
-    openModal('jtModal');
+    openPanel('jtPanel');
 }
 
 function openEditModal(id) {
@@ -160,7 +158,7 @@ function openEditModal(id) {
     document.getElementById('f_status_wrap').style.display = 'block';
     document.getElementById('f_status').setAttribute('required', 'required');
     document.getElementById('f_status').value = jt.status;
-    openModal('jtModal');
+    openPanel('jtPanel');
 }
 
 function handleHash() {
@@ -180,7 +178,7 @@ if (HAS_ERRORS) {
     } else {
         document.getElementById('jtForm').action = BASE_URL + '/admin/jenis-tagihan/store';
     }
-    openModal('jtModal');
+    openPanel('jtPanel');
 } else if (location.hash) {
     handleHash();
 }

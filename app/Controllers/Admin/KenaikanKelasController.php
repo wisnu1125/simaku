@@ -31,6 +31,12 @@ class KenaikanKelasController extends BaseController
         $idTahunAjaran = $this->request->getGet('id_tahun_ajaran');
         $idKelas = $this->request->getGet('id_kelas');
         
+        // Default ke tahun ajaran AKTIF kalau belum ada yang dipilih sama sekali
+        if (!$idTahunAjaran) {
+            $activeTA = $this->tahunAjaranModel->getActiveTahunAjaran();
+            if ($activeTA) $idTahunAjaran = $activeTA['id_tahun_ajaran'];
+        }
+        
         $data = [
             'title' => 'Kenaikan Kelas',
             'tahun_ajaran' => $this->tahunAjaranModel->orderBy('nama_tahun_ajaran', 'DESC')->findAll(),
