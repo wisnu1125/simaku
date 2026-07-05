@@ -50,22 +50,27 @@
 .summary-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.2); font-size: 13px; }
 .summary-row:last-child { border-bottom: none; padding-top: 10px; margin-top: 2px; border-top: 2px solid rgba(255,255,255,.3); }
 .summary-row .v.total { font-size: 19px; font-weight: 900; }
+
+.pay-card { border: 1.5px solid var(--brand-light); margin-bottom: 20px; }
+.pay-card-header { display: flex; align-items: center; gap: 10px; padding: 18px 20px; border-bottom: 1px solid var(--brand-light); background: var(--brand-bg); border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.pay-card-header i { font-size: 17px; color: var(--brand); }
+.pay-card-header h3 { font-size: 15.5px; font-weight: 800; color: var(--brand-darker); }
+.pay-card-body { padding: 20px; }
+
+.history-title { font-size: 14px; font-weight: 800; color: var(--ink); margin: 4px 0 14px; display: flex; align-items: center; justify-content: space-between; }
+.history-title span.count { font-size: 12px; font-weight: 600; color: var(--muted); }
 </style>
 
-<div class="page-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:10px;">
-    <div>
-        <div class="page-title">Pembayaran</div>
-        <div class="page-subtitle" id="resultCount">Memuat…</div>
-    </div>
-    <button class="btn btn-primary" onclick="openCreateModal()"><i class="fa-solid fa-plus"></i> <span class="hide-xs">Input</span></button>
+<div class="page-header" style="margin-bottom:16px;">
+    <div class="page-title">Pembayaran</div>
+    <div class="page-subtitle">Cari siswa untuk langsung input pembayaran.</div>
 </div>
 
-<!-- ===================== PANEL: Input Pembayaran (inline, bukan modal) ===================== -->
-<div class="inline-panel" id="bayarPanel">
-    <div class="inline-panel-header"><h3>Input Pembayaran</h3><button type="button" class="inline-panel-close" onclick="closePanel('bayarPanel')"><i class="fa-solid fa-xmark"></i></button></div>
+<!-- ===================== INPUT PEMBAYARAN (selalu tampil, bukan panel yang perlu dibuka) ===================== -->
+<div class="card pay-card">
+    <div class="pay-card-header"><i class="fa-solid fa-wallet"></i><h3>Input Pembayaran</h3></div>
     <form id="formPembayaran" action="<?= base_url('admin/pembayaran/store-bulk') ?>" method="POST">
-        <div class="inline-panel-body">
-            <div class="section-step"><span class="num">1</span><span class="txt">Pilih Siswa</span></div>
+        <div class="pay-card-body">
             <div class="search-box">
                 <input type="text" class="input" id="siswa_search" placeholder="Ketik NIS atau nama siswa…" autocomplete="off">
                 <div class="search-results" id="siswa_results"></div>
@@ -74,7 +79,7 @@
             <div id="selected_siswa"></div>
 
             <div id="tagihan_section" style="display:none;">
-                <div class="section-step"><span class="num">2</span><span class="txt">Tagihan Belum Lunas</span></div>
+                <div class="section-step"><span class="num">1</span><span class="txt">Tagihan Belum Lunas</span></div>
                 <div class="checklist">
                     <div class="checklist-header"><div></div><div>Tagihan</div><div>Nominal Bayar</div><div>Tanggal Bayar</div></div>
                     <div id="tagihan_list"></div>
@@ -82,7 +87,7 @@
             </div>
 
             <div id="pembayaran_section" style="display:none;">
-                <div class="section-step"><span class="num">3</span><span class="txt">Metode &amp; Catatan</span></div>
+                <div class="section-step"><span class="num">2</span><span class="txt">Metode &amp; Catatan</span></div>
                 <div class="field">
                     <label class="required">Metode Pembayaran</label>
                     <div class="segmented">
@@ -90,7 +95,7 @@
                         <label><input type="radio" name="metode_pembayaran" value="transfer" required> 🏦 Transfer</label>
                     </div>
                 </div>
-                <div class="field">
+                <div class="field" style="margin-bottom:0;">
                     <label>Catatan (opsional)</label>
                     <textarea class="input" name="keterangan" rows="2" placeholder="Contoh: dibayar oleh wali murid langsung"></textarea>
                 </div>
@@ -98,14 +103,16 @@
                     <div class="summary-row"><span>Tagihan dipilih</span><span id="summary_count">0</span></div>
                     <div class="summary-row"><span>Total dibayar</span><span class="v total" id="summary_total">Rp 0</span></div>
                 </div>
+                <div style="display:flex; gap:10px; margin-top:16px;">
+                    <button type="button" class="btn btn-secondary" onclick="resetBayarForm()">Reset</button>
+                    <button type="submit" class="btn btn-primary" id="btn_submit" disabled style="flex:1;"><i class="fa-solid fa-check-double"></i> Konfirmasi Pembayaran</button>
+                </div>
             </div>
-        </div>
-        <div class="inline-panel-footer">
-            <button type="button" class="btn btn-secondary" onclick="closePanel('bayarPanel')">Batal</button>
-            <button type="submit" class="btn btn-primary" id="btn_submit" disabled><i class="fa-solid fa-check-double"></i> Konfirmasi Pembayaran</button>
         </div>
     </form>
 </div>
+
+<div class="history-title">Riwayat Pembayaran <span class="count" id="resultCount">Memuat…</span></div>
 
 <div class="stat-grid">
     <div class="card stat-card"><div class="value" style="color:var(--success);" id="statValid">Rp 0</div><div class="label">Total Valid</div></div>
@@ -249,7 +256,7 @@ function resetBayarForm() {
     document.getElementById('btn_submit').disabled = true;
     selectedTagihan = [];
 }
-function openCreateModal() { resetBayarForm(); openPanel('bayarPanel'); }
+function openCreateModal() { resetBayarForm(); document.getElementById('siswa_search')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); document.getElementById('siswa_search')?.focus(); }
 
 // Jaga-jaga: kalau footer.php di server belum sempat diperbarui (openSearchDropdown
 // dkk. jadi belum ada), definisikan versi cadangannya di sini supaya pencarian tetap
@@ -401,14 +408,13 @@ document.getElementById('formPembayaran').addEventListener('submit', function (e
     if (selectedTagihan.length === 0) { e.preventDefault(); alert('Pilih minimal 1 tagihan untuk dibayar.'); }
 });
 
-// ===================== Buka panel otomatis dari hash (link lama / tombol "Bayar" di drawer Siswa) =====================
+// ===================== Auto-isi dari hash (link lama / tombol "Bayar" di drawer Siswa) =====================
 function handleHash() {
     const h = location.hash;
     if (h === '#bayar') { openCreateModal(); }
     else if (h.startsWith('#bayar-')) {
         const idSiswa = h.replace('#bayar-', '');
         resetBayarForm();
-        openPanel('bayarPanel');
         fetch(BASE_URL + '/admin/siswa/detail/' + idSiswa, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(r => r.json())
             .then(data => { if (data.siswa) selectSiswaObj(data.siswa); });

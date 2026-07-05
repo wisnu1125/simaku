@@ -120,8 +120,10 @@
     .sidebar-nav { flex: 1; overflow-y: auto; padding: 14px 12px; }
     .nav-group-label {
         font-size: 10.5px; font-weight: 700; color: var(--faint); text-transform: uppercase;
-        letter-spacing: 1px; padding: 14px 12px 6px;
+        letter-spacing: 1px; padding: 16px 12px 6px; margin-top: 4px;
+        border-top: 1px solid var(--border-soft);
     }
+    .nav-group-label:first-child { border-top: none; margin-top: 0; padding-top: 6px; }
     .nav-item {
         display: flex; align-items: center; gap: 11px; width: 100%;
         padding: 10px 12px; border-radius: var(--r-sm); text-decoration: none;
@@ -550,20 +552,26 @@
             <h3>Menu</h3>
             <button class="modal-close" onclick="toggleMobileNav(false)"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <div class="modal-body" style="padding-top:8px;">
+        <div class="modal-body" style="padding-top:2px;">
+            <div class="nav-group-label">Data Master</div>
             <a href="<?= base_url('admin/kelas') ?>" class="nav-item <?= simaku_active('admin/kelas') ? 'active' : '' ?>"><i class="fa-solid fa-chalkboard"></i> Kelas</a>
             <a href="<?= base_url('admin/tahun-ajaran') ?>" class="nav-item <?= simaku_active('tahun-ajaran') ? 'active' : '' ?>"><i class="fa-solid fa-calendar-days"></i> Tahun Ajaran</a>
             <a href="<?= base_url('admin/jenis-tagihan') ?>" class="nav-item <?= simaku_active('jenis-tagihan') ? 'active' : '' ?>"><i class="fa-solid fa-tags"></i> Jenis Tagihan</a>
+
+            <div class="nav-group-label">Keuangan</div>
             <a href="<?= base_url('admin/skema-tagihan') ?>" class="nav-item <?= simaku_active('skema-tagihan') ? 'active' : '' ?>"><i class="fa-solid fa-sitemap"></i> Skema Tagihan</a>
             <a href="<?= base_url('admin/beasiswa') ?>" class="nav-item <?= simaku_active('admin/beasiswa') ? 'active' : '' ?>"><i class="fa-solid fa-award"></i> Beasiswa</a>
             <a href="<?= base_url('admin/laporan') ?>" class="nav-item <?= simaku_active('admin/laporan') ? 'active' : '' ?>"><i class="fa-solid fa-chart-line"></i> Laporan</a>
+
+            <div class="nav-group-label">Akademik</div>
             <a href="<?= base_url('admin/kenaikan-kelas') ?>" class="nav-item <?= simaku_active('kenaikan-kelas') ? 'active' : '' ?>"><i class="fa-solid fa-arrow-up-right-dots"></i> Kenaikan Kelas</a>
+
             <?php if ($__role === 'super_admin'): ?>
             <div class="nav-group-label">Pengaturan</div>
             <a href="<?= base_url('admin/users') ?>" class="nav-item <?= simaku_active('admin/users') ? 'active' : '' ?>"><i class="fa-solid fa-user-shield"></i> User Management</a>
             <a href="<?= base_url('admin/audit-log') ?>" class="nav-item <?= simaku_active('audit-log') ? 'active' : '' ?>"><i class="fa-solid fa-clock-rotate-left"></i> Audit Log</a>
             <?php endif; ?>
-            <a href="<?= base_url('admin/logout') ?>" class="nav-item" style="color:var(--danger); margin-top:8px;"><i class="fa-solid fa-power-off"></i> Logout</a>
+            <a href="<?= base_url('admin/logout') ?>" class="nav-item" style="color:var(--danger); margin-top:12px; border-top:1px solid var(--border-soft); padding-top:14px;"><i class="fa-solid fa-power-off"></i> Logout</a>
         </div>
     </div>
 
