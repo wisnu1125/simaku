@@ -110,6 +110,21 @@ class SiswaController extends BaseController
         ]);
     }
     
+    /**
+     * Konversi input tanggal format DD-MM-YYYY (yang diketik user) ke YYYY-MM-DD
+     * (format yang disimpan di kolom DATE database). Validasi format sudah
+     * dipastikan benar oleh rule valid_date[d-m-Y] sebelum method ini dipanggil.
+     */
+    private function convertTanggalLahir(?string $input): ?string
+    {
+        if (empty($input)) return null;
+        $input = trim($input);
+        if (!preg_match('/^(\d{2})-(\d{2})-(\d{4})$/', $input, $m)) return null;
+        [, $day, $month, $year] = $m;
+        if (!checkdate((int) $month, (int) $day, (int) $year)) return null;
+        return sprintf('%04d-%02d-%02d', $year, $month, $day);
+    }
+    
     private function applySiswaFilters($builder, string $q, $fKelas, $fStatus, $fTA = null)
     {
         if ($q !== '') {
@@ -149,7 +164,7 @@ class SiswaController extends BaseController
             'nis' => 'required|is_unique[siswa.nis]',
             'nisn' => 'permit_empty|is_unique[siswa.nisn]',
             'nama_lengkap' => 'required|min_length[3]',
-            'tanggal_lahir' => 'required|valid_date',
+            'tanggal_lahir' => 'required|valid_date[d-m-Y]',
             'jenis_kelamin' => 'required|in_list[L,P]',
             'id_kelas' => 'permit_empty|integer',
             'virtual_account' => 'permit_empty|max_length[20]'
@@ -170,7 +185,7 @@ class SiswaController extends BaseController
             'nis' => $this->request->getPost('nis'),
             'nisn' => $this->request->getPost('nisn') ?: null,
             'nama_lengkap' => $this->request->getPost('nama_lengkap'),
-            'tanggal_lahir' => $this->request->getPost('tanggal_lahir'),
+            'tanggal_lahir' => $this->convertTanggalLahir($this->request->getPost('tanggal_lahir')),
             'jenis_kelamin' => $this->request->getPost('jenis_kelamin'),
             'alamat' => $this->request->getPost('alamat'),
             'nama_wali' => $this->request->getPost('nama_wali'),
@@ -271,7 +286,7 @@ class SiswaController extends BaseController
             'nis' => "required|is_unique[siswa.nis,id_siswa,{$id}]",
             'nisn' => "permit_empty|is_unique[siswa.nisn,id_siswa,{$id}]",
             'nama_lengkap' => 'required|min_length[3]',
-            'tanggal_lahir' => 'required|valid_date',
+            'tanggal_lahir' => 'required|valid_date[d-m-Y]',
             'jenis_kelamin' => 'required|in_list[L,P]',
             'status_siswa' => 'required|in_list[aktif,nonaktif,lulus]',
             'id_kelas' => 'permit_empty|integer',
@@ -286,7 +301,7 @@ class SiswaController extends BaseController
             'nis' => $this->request->getPost('nis'),
             'nisn' => $this->request->getPost('nisn') ?: null,
             'nama_lengkap' => $this->request->getPost('nama_lengkap'),
-            'tanggal_lahir' => $this->request->getPost('tanggal_lahir'),
+            'tanggal_lahir' => $this->convertTanggalLahir($this->request->getPost('tanggal_lahir')),
             'jenis_kelamin' => $this->request->getPost('jenis_kelamin'),
             'alamat' => $this->request->getPost('alamat'),
             'nama_wali' => $this->request->getPost('nama_wali'),

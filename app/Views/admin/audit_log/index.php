@@ -48,7 +48,7 @@
 </div>
 
 <!-- ===================== DRAWER: Detail Log ===================== -->
-<div class="inline-panel" id="logPanel">
+<div class="inline-panel inline-panel-narrow" id="logPanel">
     <div class="inline-panel-header"><button type="button" class="inline-panel-close" onclick="closePanel('logPanel')"><i class="fa-solid fa-xmark"></i></button><h3>Detail Aktivitas</h3></div>
     <div class="inline-panel-body" id="drawerBody"></div>
 </div>

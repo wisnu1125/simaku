@@ -1,60 +1,80 @@
-# CodeIgniter 4 Framework
+# SIMAKU — Audit Menyeluruh Sebelum Deploy
 
-## What is CodeIgniter?
+## Cara memasang
+Salin 3 file ke lokasi yang sama di server.
 
-CodeIgniter is a PHP full-stack web framework that is light, fast, flexible and secure.
-More information can be found at the [official site](https://codeigniter.com).
+## Bug yang ditemukan & diperbaiki di audit ini
 
-This repository holds the distributable version of the framework.
-It has been built from the
-[development repository](https://github.com/codeigniter4/CodeIgniter4).
+### 1. `Views/admin/pembayaran/detail.php` — terlewat dari redesain sejak awal
+Halaman ini (dibuka lewat ikon mata di daftar Pembayaran) ternyata **belum
+pernah ikut diperbarui sama sekali** sepanjang sesi kita — masih pakai
+font & warna lama, dan modal "Batalkan Pembayaran"-nya pakai pola yang
+beda sendiri dari sistem desain yang sekarang. Fungsinya tetap jalan,
+tapi tampilannya "loncat" dari halaman lain. Sudah saya tulis ulang
+dengan sistem desain yang sama (Roboto, kartu kwitansi, panel inline
+untuk pembatalan) — logic-nya (termasuk field alasan pembatalan wajib
+diisi) saya pertahankan persis.
 
-More information about the plans for version 4 can be found in [CodeIgniter 4](https://forum.codeigniter.com/forumdisplay.php?fid=28) on the forums.
+### 2. `Views/admin/pembayaran/kwitansi_pdf.php` — PHP Deprecated Warning
+Fungsi `terbilang()` (angka jadi teks, buat kwitansi) memakai hasil
+pembagian sebagai index array. Di PHP 8.1+, itu memicu warning
+"Implicit conversion from float to int" — sekarang baru sekadar
+peringatan, tapi berpotensi jadi **error fatal** di versi PHP yang
+lebih baru. Sudah diperbaiki pakai `intdiv()`. Sudah saya tes dengan
+angka ganjil (Rp 1.450.750) untuk pastikan tidak muncul lagi.
 
-You can read the [user guide](https://codeigniter.com/user_guide/)
-corresponding to the latest version of the framework.
+### 3. `Views/public/home.php` — celah keamanan (XSS)
+Di halaman publik cek tagihan, kalau validasi form gagal, nilai
+"Tanggal Lahir" yang tadi diketik user ditampilkan lagi tanpa disaring
+(`old()` tanpa `esc()`). Ini celah **Cross-Site Scripting** — orang
+jahat bisa menyisipkan kode berbahaya lewat field ini. Sudah
+diperbaiki, sekarang nilainya disaring dulu sebelum ditampilkan.
 
-## Important Change with index.php
+## Yang sudah dicek dan AMAN (tidak perlu tindakan)
+- Sintaks seluruh 123 file PHP di project — valid semua
+- Seluruh 4 perbaikan Tahap 1 (status tahun ajaran, role user, status
+  tagihan otomatis lunas, Operasional) — masih utuh, tidak ada yang
+  ke-revert selama proses redesain
+- Tidak ada pola SQL Injection (semua query pakai query builder,
+  bukan string mentah)
+- Semua halaman aktif (termasuk kartu pembayaran & kwitansi PDF)
+  sudah dites render dengan data kosong maupun terisi — bersih
 
-`index.php` is no longer in the root of the project! It has been moved inside the *public* folder,
-for better security and separation of components.
+## File LAMA yang aman dihapus (sudah 100% tidak terpakai)
+Ini bukan bug, cuma beres-beres — file-file ini sudah tidak
+direferensikan route mana pun karena fungsinya sudah dipindah jadi
+modal/panel inline di halaman index masing-masing:
+```
+Views/admin/operasional/ (seluruh folder)
+Views/admin/tagihan/generate.php
+Views/admin/jenis_tagihan/form.php
+Views/admin/siswa/detail.php
+Views/admin/siswa/form.php
+Views/admin/kenaikan_kelas/kelulusan.php
+Views/admin/kenaikan_kelas/form.php
+Views/admin/tahun_ajaran/form.php
+Views/admin/kelas/form.php
+Views/admin/beasiswa/form.php
+Views/admin/skema_tagihan/form.php
+Controllers/Admin/OperasionalController.php
+```
+Boleh dihapus manual dari server kalau mau beres-beres, atau
+dibiarkan saja — tidak mengganggu apa pun karena sudah tidak
+ada yang mengarah ke sana.
 
-This means that you should configure your web server to "point" to your project's *public* folder, and
-not to the project root. A better practice would be to configure a virtual host to point there. A poor practice would be to point your web server to the project root and expect to enter *public/...*, as the rest of your logic and the
-framework are exposed.
+## Checklist sebelum benar-benar deploy (di luar kode, di server Anda)
+Ini bukan sesuatu yang bisa saya perbaiki lewat file, tapi **penting**
+dicek langsung di server tujuan deploy:
 
-**Please** read the user guide for a better explanation of how CI4 works!
-
-## Repository Management
-
-We use GitHub issues, in our main repository, to track **BUGS** and to track approved **DEVELOPMENT** work packages.
-We use our [forum](http://forum.codeigniter.com) to provide SUPPORT and to discuss
-FEATURE REQUESTS.
-
-This repository is a "distribution" one, built by our release preparation script.
-Problems with it can be raised on our forum, or as issues in the main repository.
-
-## Contributing
-
-We welcome contributions from the community.
-
-Please read the [*Contributing to CodeIgniter*](https://github.com/codeigniter4/CodeIgniter4/blob/develop/CONTRIBUTING.md) section in the development repository.
-
-## Server Requirements
-
-PHP version 8.1 or higher is required, with the following extensions installed:
-
-- [intl](http://php.net/manual/en/intl.requirements.php)
-- [mbstring](http://php.net/manual/en/mbstring.installation.php)
-
-> [!WARNING]
-> - The end of life date for PHP 7.4 was November 28, 2022.
-> - The end of life date for PHP 8.0 was November 26, 2023.
-> - If you are still using PHP 7.4 or 8.0, you should upgrade immediately.
-> - The end of life date for PHP 8.1 will be December 31, 2025.
-
-Additionally, make sure that the following extensions are enabled in your PHP:
-
-- json (enabled by default - don't turn it off)
-- [mysqlnd](http://php.net/manual/en/mysqlnd.install.php) if you plan to use MySQL
-- [libcurl](http://php.net/manual/en/curl.requirements.php) if you plan to use the HTTP\CURLRequest library
+1. **File `.env`**: pastikan `CI_ENVIRONMENT = production` (bukan
+   `development`) — supaya pesan error PHP yang detail tidak
+   tertampil ke pengunjung kalau ada masalah, cuma tercatat di log.
+2. **`app.baseURL`** di `.env`: samakan protokolnya (`http://` atau
+   `https://`) dengan yang benar-benar dipakai server produksi Anda —
+   ini akar masalah CORS yang kita temukan sebelumnya.
+3. Folder **`writable/`** harus bisa ditulis oleh web server (izin
+   akses/permission) — dipakai untuk cache, log, dan session.
+4. Database produksi: pastikan sudah menjalankan SQL migrasi dari
+   Tahap 1 (`001_perbaikan_data.sql`) kalau belum pernah, dan SQL
+   perbaikan tagihan Rp 0 (`perbaikan_tagihan_nol.sql`) kalau ada data
+   lama yang bermasalah.

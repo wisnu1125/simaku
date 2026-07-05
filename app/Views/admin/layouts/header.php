@@ -235,6 +235,9 @@
     }
     .inline-panel-footer .btn { flex: none; }
     @media (max-width: 640px) { .inline-panel-footer { flex-direction: column-reverse; } .inline-panel-footer .btn { flex: 1; width: 100%; } }
+    /* Varian sempit -- dipakai untuk panel yang isinya detail/info (bukan form
+       banyak kolom), supaya tidak terasa lengang saat melebar penuh di desktop. */
+    @media (min-width: 900px) { .inline-panel-narrow { max-width: 520px; margin-left: auto; margin-right: auto; } }
 
     /* ============================== BADGES ============================== */
     .badge {

@@ -31,6 +31,10 @@
 .pager .btns { display: flex; gap: 6px; }
 
 .va-hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+.detail-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 700px) { .detail-grid { grid-template-columns: 1fr 1fr; align-items: start; } }
+.detail-col { display: flex; flex-direction: column; gap: 16px; }
 </style>
 
 <div class="page-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:10px;">
@@ -75,7 +79,8 @@
             <div class="field-row">
                 <div class="field">
                     <label class="required">Tanggal Lahir</label>
-                    <input type="date" class="input" name="tanggal_lahir" id="f_tanggal_lahir" value="<?= esc(old('tanggal_lahir', '')) ?>" required>
+                    <input type="text" class="input" name="tanggal_lahir" id="f_tanggal_lahir" placeholder="DD-MM-YYYY" pattern="\d{2}-\d{2}-\d{4}" inputmode="numeric" value="<?= esc(old('tanggal_lahir', '')) ?>" required>
+                    <div class="field-hint">Contoh: 15-08-2012</div>
                 </div>
                 <div class="field">
                     <label class="required">Jenis Kelamin</label>
@@ -250,6 +255,7 @@
                 <tr>
                     <th>NIS</th>
                     <th>Nama Lengkap</th>
+                    <th>Tanggal Lahir</th>
                     <th>Kelas</th>
                     <th>Virtual Account</th>
                     <th>Status</th>
@@ -287,7 +293,19 @@ function statusBadge(s) {
 }
 function esc(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
 function fmt(n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
-function fmtDate(d) { if (!d) return '—'; const dt = new Date(d); return dt.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }); }
+function fmtDate(d) { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}-${m}-${y}`; }
+// Ubah YYYY-MM-DD (dari server) jadi DD-MM-YYYY (buat isi field teks saat edit)
+function toDDMMYYYY(isoDate) { if (!isoDate) return ''; const [y, m, d] = isoDate.split('-'); return `${d}-${m}-${y}`; }
+
+// Auto-sisip tanda strip saat mengetik tanggal (format DD-MM-YYYY), sama seperti di halaman publik
+document.getElementById('f_tanggal_lahir').addEventListener('input', function (e) {
+    if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') return;
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length > 8) value = value.slice(0, 8);
+    if (value.length >= 2) value = value.slice(0, 2) + '-' + value.slice(2);
+    if (value.length >= 5) value = value.slice(0, 5) + '-' + value.slice(5, 9);
+    e.target.value = value;
+});
 
 function showSkeleton() {
     let html = '';
@@ -341,6 +359,7 @@ async function loadPage() {
                     <div style="font-weight:700; color:var(--ink);">${esc(s.nama_lengkap)}</div>
                     <div style="font-size:11.5px; color:var(--muted);"><i class="fa-solid fa-${s.jenis_kelamin === 'L' ? 'mars' : 'venus'}"></i> ${s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</div>
                 </td>
+                <td class="mono" style="font-size:12.5px;">${fmtDate(s.tanggal_lahir)}</td>
                 <td>${s.nama_kelas ? '<span class="badge badge-neutral">' + esc(s.nama_kelas) + '</span>' : '<span style="color:var(--faint);">—</span>'}</td>
                 <td><span class="va-code">${esc(s.virtual_account)}</span></td>
                 <td>${statusBadge(s.status_siswa)}</td>
@@ -419,7 +438,7 @@ function fillEditForm(s) {
     document.getElementById('f_nis').value = s.nis || '';
     document.getElementById('f_nisn').value = s.nisn || '';
     document.getElementById('f_nama_lengkap').value = s.nama_lengkap || '';
-    document.getElementById('f_tanggal_lahir').value = s.tanggal_lahir || '';
+    document.getElementById('f_tanggal_lahir').value = toDDMMYYYY(s.tanggal_lahir);
     document.getElementById('f_jk_l').checked = s.jenis_kelamin === 'L';
     document.getElementById('f_jk_p').checked = s.jenis_kelamin === 'P';
     document.getElementById('f_alamat').value = s.alamat || '';
@@ -486,7 +505,16 @@ function renderDrawer(data) {
     const r = data.ringkasan;
     const waLink = s.telp_wali ? 'https://wa.me/' + s.telp_wali.replace(/[^0-9]/g, '') : null;
 
-    let html = `
+    let tagihanHtml = '';
+    if (data.tagihan_terbaru && data.tagihan_terbaru.length > 0) {
+        tagihanHtml = `<div class="eyebrow" style="margin-bottom:8px;">Tagihan Terbaru</div><div class="card" style="padding:4px 16px;">`;
+        data.tagihan_terbaru.forEach(t => {
+            tagihanHtml += `<div class="info-row"><span class="k">${esc(t.nama_tagihan)}${t.bulan_tagihan ? ' (Bln ' + t.bulan_tagihan + ')' : ''}</span><span class="v">${t.status_tagihan === 'lunas' ? '<span class="badge badge-success">Lunas</span>' : 'Rp ' + fmt(t.sisa_tagihan)}</span></div>`;
+        });
+        tagihanHtml += `</div><a href="${BASE_URL}/admin/tagihan/detail/${s.id_siswa}" style="font-size:12.5px; font-weight:700; color:var(--brand); margin-top:8px; display:inline-block;">Lihat semua tagihan <i class="fa-solid fa-arrow-right"></i></a>`;
+    }
+
+    document.getElementById('drawerBody').innerHTML = `
         <div style="text-align:center; margin-bottom:18px;">
             <div class="avatar" style="width:64px;height:64px;font-size:22px;margin:0 auto 10px;">${initial(s.nama_lengkap)}</div>
             <div style="font-size:16px; font-weight:800; color:var(--ink);">${esc(s.nama_lengkap)}</div>
@@ -494,43 +522,45 @@ function renderDrawer(data) {
             <div style="margin-top:8px;">${statusBadge(s.status_siswa)}</div>
         </div>
 
-        <div class="card" style="padding:14px; margin-bottom:16px; display:flex; gap:10px;">
+        <div class="card" style="padding:14px; margin-bottom:18px; display:flex; gap:10px; max-width:420px; margin-left:auto; margin-right:auto;">
             <button class="btn btn-primary btn-block btn-sm" onclick="closePanel('siswaDetailPanel'); openEditModal(${s.id_siswa});"><i class="fa-solid fa-pencil"></i> Edit</button>
             <a class="btn btn-secondary btn-block btn-sm" href="${BASE_URL}/admin/pembayaran#bayar-${s.id_siswa}"><i class="fa-solid fa-wallet"></i> Bayar</a>
         </div>
 
-        <div class="eyebrow" style="margin-bottom:8px;">Ringkasan Keuangan</div>
-        <div class="card" style="padding:4px 16px; margin-bottom:18px;">
-            <div class="info-row"><span class="k">Total Tagihan</span><span class="v">Rp ${fmt(r.total_tagihan)}</span></div>
-            <div class="info-row"><span class="k">Sudah Dibayar</span><span class="v" style="color:var(--success);">Rp ${fmt(r.total_dibayar)}</span></div>
-            <div class="info-row"><span class="k">Sisa Tagihan</span><span class="v" style="color:${r.total_sisa > 0 ? 'var(--danger)' : 'var(--success)'};">Rp ${fmt(r.total_sisa)}</span></div>
-        </div>
+        <div class="detail-grid">
+            <div class="detail-col">
+                <div>
+                    <div class="eyebrow" style="margin-bottom:8px;">Ringkasan Keuangan</div>
+                    <div class="card" style="padding:4px 16px;">
+                        <div class="info-row"><span class="k">Total Tagihan</span><span class="v">Rp ${fmt(r.total_tagihan)}</span></div>
+                        <div class="info-row"><span class="k">Sudah Dibayar</span><span class="v" style="color:var(--success);">Rp ${fmt(r.total_dibayar)}</span></div>
+                        <div class="info-row"><span class="k">Sisa Tagihan</span><span class="v" style="color:${r.total_sisa > 0 ? 'var(--danger)' : 'var(--success)'};">Rp ${fmt(r.total_sisa)}</span></div>
+                    </div>
+                </div>
+                ${tagihanHtml}
+            </div>
 
-        <div class="eyebrow" style="margin-bottom:8px;">Data Pribadi</div>
-        <div class="card" style="padding:4px 16px; margin-bottom:18px;">
-            <div class="info-row"><span class="k">NISN</span><span class="v">${s.nisn ? esc(s.nisn) : '—'}</span></div>
-            <div class="info-row"><span class="k">Jenis Kelamin</span><span class="v">${s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</span></div>
-            <div class="info-row"><span class="k">Tanggal Lahir</span><span class="v">${fmtDate(s.tanggal_lahir)}</span></div>
-            <div class="info-row"><span class="k">Kelas</span><span class="v">${s.nama_kelas ? esc(s.nama_kelas) : 'Belum ada kelas'}</span></div>
-            <div class="info-row"><span class="k">Virtual Account</span><span class="v mono">${esc(s.virtual_account)}</span></div>
-        </div>
-
-        <div class="eyebrow" style="margin-bottom:8px;">Wali</div>
-        <div class="card" style="padding:4px 16px; margin-bottom:18px;">
-            <div class="info-row"><span class="k">Nama</span><span class="v">${s.nama_wali ? esc(s.nama_wali) : '—'}</span></div>
-            <div class="info-row"><span class="k">Telepon</span><span class="v">${s.telp_wali ? esc(s.telp_wali) : '—'} ${waLink ? '<a href="' + waLink + '" target="_blank" style="color:var(--success); margin-left:6px;"><i class="fa-brands fa-whatsapp"></i></a>' : ''}</span></div>
+            <div class="detail-col">
+                <div>
+                    <div class="eyebrow" style="margin-bottom:8px;">Data Pribadi</div>
+                    <div class="card" style="padding:4px 16px;">
+                        <div class="info-row"><span class="k">NISN</span><span class="v">${s.nisn ? esc(s.nisn) : '—'}</span></div>
+                        <div class="info-row"><span class="k">Jenis Kelamin</span><span class="v">${s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</span></div>
+                        <div class="info-row"><span class="k">Tanggal Lahir</span><span class="v">${fmtDate(s.tanggal_lahir)}</span></div>
+                        <div class="info-row"><span class="k">Kelas</span><span class="v">${s.nama_kelas ? esc(s.nama_kelas) : 'Belum ada kelas'}</span></div>
+                        <div class="info-row"><span class="k">Virtual Account</span><span class="v mono">${esc(s.virtual_account)}</span></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="eyebrow" style="margin-bottom:8px;">Wali</div>
+                    <div class="card" style="padding:4px 16px;">
+                        <div class="info-row"><span class="k">Nama</span><span class="v">${s.nama_wali ? esc(s.nama_wali) : '—'}</span></div>
+                        <div class="info-row"><span class="k">Telepon</span><span class="v">${s.telp_wali ? esc(s.telp_wali) : '—'} ${waLink ? '<a href="' + waLink + '" target="_blank" style="color:var(--success); margin-left:6px;"><i class="fa-brands fa-whatsapp"></i></a>' : ''}</span></div>
+                    </div>
+                </div>
+            </div>
         </div>
     `;
-
-    if (data.tagihan_terbaru && data.tagihan_terbaru.length > 0) {
-        html += `<div class="eyebrow" style="margin-bottom:8px;">Tagihan Terbaru</div><div class="card" style="padding:4px 16px; margin-bottom:10px;">`;
-        data.tagihan_terbaru.forEach(t => {
-            html += `<div class="info-row"><span class="k">${esc(t.nama_tagihan)}${t.bulan_tagihan ? ' (Bln ' + t.bulan_tagihan + ')' : ''}</span><span class="v">${t.status_tagihan === 'lunas' ? '<span class="badge badge-success">Lunas</span>' : 'Rp ' + fmt(t.sisa_tagihan)}</span></div>`;
-        });
-        html += `</div><a href="${BASE_URL}/admin/tagihan/detail/${s.id_siswa}" style="font-size:12.5px; font-weight:700; color:var(--brand);">Lihat semua tagihan <i class="fa-solid fa-arrow-right"></i></a>`;
-    }
-
-    document.getElementById('drawerBody').innerHTML = html;
 }
 
 // ===================== MODAL: Impor Excel =====================

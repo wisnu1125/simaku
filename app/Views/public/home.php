@@ -505,7 +505,7 @@
                                id="tanggal_lahir" 
                                name="tanggal_lahir" 
                                placeholder="DD-MM-YYYY"
-                               value="<?= old('tanggal_lahir') ?>"
+                               value="<?= esc(old('tanggal_lahir')) ?>"
                                inputmode="numeric"
                                pattern="\d{2}-\d{2}-\d{4}"
                                autocomplete="off"
