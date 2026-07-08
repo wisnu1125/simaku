@@ -54,34 +54,50 @@ class XenditController extends BaseController
     /**
      * Endpoint webhook -- didaftarkan di Dashboard Xendit > Settings > Webhooks.
      * URL: https://domain-anda.com/xendit/webhook
+     *
+     * Controller ini SENGAJA dibuat tipis: cuma validasi token + format, panggil
+     * Service, dan kembalikan response. Semua logic bisnis (termasuk logging) ada
+     * di XenditService, supaya tidak ada duplikasi kalau nanti dipanggil dari
+     * tempat lain (mis. testing).
      */
     public function webhook()
     {
         $config = new XenditConfig();
         $tokenDiterima = $this->request->getHeaderLine('X-Callback-Token');
+        $rawBody = $this->request->getBody();
+        $headers = [];
+        foreach ($this->request->headers() as $h) {
+            $headers[$h->getName()] = $h->getValueLine();
+        }
 
         // Kalau webhook token belum diatur di .env, tolak semua webhook demi keamanan
         // (daripada diam-diam menerima notifikasi palsu dari pihak yang tidak dikenal).
         if (empty($config->webhookToken)) {
             log_message('error', 'Webhook Xendit ditolak: webhookToken belum diatur di .env');
+            $this->xenditService->logWebhookRequest($headers, $tokenDiterima, $rawBody, 'ERROR', 500, 'Webhook belum dikonfigurasi', 'xendit.webhookToken kosong di .env');
             return $this->response->setStatusCode(500)->setJSON(['error' => 'Webhook belum dikonfigurasi di server']);
         }
 
         if (!$tokenDiterima || !hash_equals($config->webhookToken, $tokenDiterima)) {
             log_message('warning', 'Webhook Xendit ditolak: X-Callback-Token tidak cocok.');
+            $this->xenditService->logWebhookRequest($headers, $tokenDiterima, $rawBody, 'INVALID_TOKEN', 401, 'Token tidak valid');
             return $this->response->setStatusCode(401)->setJSON(['error' => 'Token tidak valid']);
         }
 
         $payload = $this->request->getJSON(true);
         if (!$payload) {
+            $this->xenditService->logWebhookRequest($headers, $tokenDiterima, $rawBody, 'INVALID_PAYLOAD', 400, 'Payload tidak valid');
             return $this->response->setStatusCode(400)->setJSON(['error' => 'Payload tidak valid']);
         }
 
         $result = $this->xenditService->processWebhookPayload($payload);
+        $responseCode = $result['success'] ? 200 : 500;
 
         // Selalu balas 200 kalau payload berhasil DIPROSES (walau isinya "dilewati karena
         // sudah pernah") -- supaya Xendit tidak terus mencoba mengirim ulang. Cuma balas
         // status lain kalau memang ada error di sisi kita.
-        return $this->response->setStatusCode($result['success'] ? 200 : 500)->setJSON($result);
+        $this->xenditService->logWebhookRequest($headers, $tokenDiterima, $rawBody, 'VALID', $responseCode, json_encode($result));
+
+        return $this->response->setStatusCode($responseCode)->setJSON($result);
     }
 }

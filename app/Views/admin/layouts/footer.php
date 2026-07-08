@@ -113,6 +113,19 @@ function closePanel(id) {
     document.getElementById(id)?.classList.remove('open');
 }
 
+// ---------- Toast notifikasi (dipanggil dari JS, memakai toast-stack yang sudah ada di layout) ----------
+function showToast(message, type = 'success') {
+    const stack = document.getElementById('toastStack');
+    if (!stack) return;
+    const validType = ['success', 'error', 'warning', 'info'].includes(type) ? type : (type === 'danger' ? 'error' : 'success');
+    const iconMap = { success: 'circle-check', error: 'circle-exclamation', warning: 'triangle-exclamation', info: 'circle-info' };
+    const el = document.createElement('div');
+    el.className = 'toast ' + validType;
+    el.innerHTML = `<i class="fa-solid fa-${iconMap[validType]} icon"></i><span>${message}</span><i class="fa-solid fa-xmark close" onclick="this.parentElement.remove()"></i>`;
+    stack.appendChild(el);
+    setTimeout(() => el.remove(), 5000);
+}
+
 // ---------- Format Rupiah ----------
 function formatRupiah(angka, prefix = 'Rp ') {
     const number_string = angka.toString().replace(/[^,\d]/g, '');

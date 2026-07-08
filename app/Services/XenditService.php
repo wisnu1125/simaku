@@ -6,6 +6,8 @@ use App\Models\SiswaModel;
 use App\Models\TagihanModel;
 use App\Models\PembayaranModel;
 use App\Models\XenditTransactionModel;
+use App\Models\PaymentLogModel;
+use App\Models\PaymentWebhookLogModel;
 use Config\Xendit as XenditConfig;
 
 class XenditService
@@ -14,6 +16,8 @@ class XenditService
     protected $tagihanModel;
     protected $pembayaranModel;
     protected $xenditTransactionModel;
+    protected $paymentLogModel;
+    protected $paymentWebhookLogModel;
     protected $config;
 
     public function __construct()
@@ -22,12 +26,17 @@ class XenditService
         $this->tagihanModel = new TagihanModel();
         $this->pembayaranModel = new PembayaranModel();
         $this->xenditTransactionModel = new XenditTransactionModel();
+        $this->paymentLogModel = new PaymentLogModel();
+        $this->paymentWebhookLogModel = new PaymentWebhookLogModel();
         $this->config = new XenditConfig();
     }
 
+    // ================================================================
+    // BAGIAN 1: BUAT INVOICE (dipakai wali murid saat klik "Bayar Online")
+    // ================================================================
+
     /**
      * Buat invoice Xendit untuk 1 atau lebih tagihan milik 1 siswa.
-     * Dipanggil dari halaman publik saat wali murid pilih tagihan yang mau dibayar online.
      *
      * @return array ['success' => bool, 'invoice_url' => string|null, 'message' => string|null]
      */
@@ -53,7 +62,7 @@ class XenditService
         foreach ($idTagihanList as $idTagihan) {
             $t = $this->tagihanModel->find((int) $idTagihan);
             if (!$t || (int) $t['id_siswa'] !== $idSiswa || $t['status_tagihan'] === 'lunas') {
-                continue; // lewati diam-diam -- tagihan tidak valid/sudah lunas/bukan milik siswa ini
+                continue;
             }
             $tagihanValid[] = $t;
             $totalAmount += (float) $t['sisa_tagihan'];
@@ -71,17 +80,15 @@ class XenditService
             'description' => 'Pembayaran SIMAKU - ' . $siswa['nama_lengkap'] . ' (' . count($tagihanValid) . ' tagihan)',
             'currency' => 'IDR',
             'invoice_duration' => $this->config->invoiceDurationSeconds,
-            'customer' => [
-                'given_names' => $siswa['nama_lengkap'],
-            ],
+            'customer' => ['given_names' => $siswa['nama_lengkap']],
             'success_redirect_url' => base_url('cek-tagihan/pembayaran-selesai/' . $externalId),
         ];
 
-        $result = $this->httpPost('/v2/invoices', $payload);
+        $result = $this->httpRequest('POST', '/v2/invoices', $payload);
 
         if (!$result['success']) {
             log_message('error', 'Xendit createInvoice gagal: ' . json_encode($result));
-            return ['success' => false, 'message' => 'Gagal membuat tagihan pembayaran online. Silakan coba lagi.'];
+            return ['success' => false, 'message' => $this->pesanErrorUntukUser($result)];
         }
 
         $invoice = $result['data'];
@@ -99,10 +106,89 @@ class XenditService
         return ['success' => true, 'invoice_url' => $invoice['invoice_url'] ?? null];
     }
 
+    // ================================================================
+    // BAGIAN 2: CEK STATUS KE XENDIT (dasar untuk sync manual & cron)
+    // ================================================================
+
     /**
-     * Proses payload webhook dari Xendit (setelah token-nya divalidasi oleh controller).
-     * Aman dipanggil berkali-kali dengan payload yang sama (idempotent) -- Xendit kadang
-     * mengirim notifikasi yang sama lebih dari 1x.
+     * Ambil detail invoice langsung dari Xendit berdasarkan invoice_id.
+     * @return array ['success' => bool, 'data' => array|null, 'message' => string|null, 'error_type' => string|null]
+     */
+    public function getInvoiceStatus(string $invoiceId): array
+    {
+        return $this->httpRequest('GET', '/v2/invoices/' . urlencode($invoiceId));
+    }
+
+    /**
+     * Ambil detail invoice dari Xendit berdasarkan external_id (dipakai kalau invoice_id belum/tidak diketahui).
+     * Xendit bisa mengembalikan lebih dari 1 hasil kalau external_id dipakai berkali-kali -- kita ambil yang
+     * pertama karena di sistem kita external_id memang dibuat unik per percobaan pembayaran.
+     */
+    public function getInvoiceByExternalId(string $externalId): array
+    {
+        $result = $this->httpRequest('GET', '/v2/invoices?external_id=' . urlencode($externalId));
+        if ($result['success'] && is_array($result['data']) && isset($result['data'][0])) {
+            $result['data'] = $result['data'][0];
+        }
+        return $result;
+    }
+
+    /**
+     * Sinkronkan 1 transaksi: tanya status terbaru ke Xendit, kalau berubah jadi PAID
+     * (dan di database kita masih pending), proses lewat updatePaymentAsPaid().
+     * Dipakai baik oleh tombol "Sinkronkan" (MANUAL) maupun command cron (CRON).
+     *
+     * @return array ['success' => bool, 'changed' => bool, 'message' => string]
+     */
+    public function syncInvoice(int $idTransaction, string $source = 'MANUAL'): array
+    {
+        $trx = $this->xenditTransactionModel->find($idTransaction);
+        if (!$trx) {
+            return ['success' => false, 'changed' => false, 'message' => 'Transaksi tidak ditemukan di database.'];
+        }
+
+        // Sudah final (paid/expired/failed) -- tidak perlu tanya ke Xendit lagi, cuma buang-buang API call.
+        // "failed" tetap boleh di-sync ulang siapa tahu statusnya berubah, tapi paid & expired sudah pasti final.
+        if ($trx['status'] === 'paid') {
+            return ['success' => true, 'changed' => false, 'message' => 'Transaksi ini sudah lunas sebelumnya.'];
+        }
+
+        $result = $this->getInvoiceStatus($trx['xendit_invoice_id']);
+
+        $this->xenditTransactionModel->update($idTransaction, ['last_synced_at' => date('Y-m-d H:i:s')]);
+
+        if (!$result['success']) {
+            $this->logPaymentChange($trx, null, $source, $trx['status'], $trx['status'], $result, 'Sync gagal: ' . $this->pesanErrorUntukUser($result));
+            return ['success' => false, 'changed' => false, 'message' => $this->pesanErrorUntukUser($result)];
+        }
+
+        $xenditStatus = $result['data']['status'] ?? null;
+        $statusMap = ['PAID' => 'paid', 'SETTLED' => 'paid', 'EXPIRED' => 'expired'];
+        $statusBaru = $statusMap[$xenditStatus] ?? null;
+
+        if ($statusBaru === 'paid') {
+            $prosesResult = $this->updatePaymentAsPaid($trx, $this->normalisasiDataXendit($result['data']), $source);
+            return ['success' => $prosesResult['success'], 'changed' => $prosesResult['success'], 'message' => $prosesResult['message']];
+        }
+
+        if ($statusBaru === 'expired' && $trx['status'] !== 'expired') {
+            $this->xenditTransactionModel->update($idTransaction, ['status' => 'expired']);
+            $this->logPaymentChange($trx, null, $source, $trx['status'], 'expired', $result, 'Invoice kedaluwarsa (dari sync).');
+            return ['success' => true, 'changed' => true, 'message' => 'Invoice sudah kedaluwarsa.'];
+        }
+
+        // Masih PENDING di Xendit juga -- tidak ada perubahan
+        $this->logPaymentChange($trx, null, $source, $trx['status'], $trx['status'], $result, 'Status masih PENDING, tidak ada perubahan.');
+        return ['success' => true, 'changed' => false, 'message' => 'Status masih menunggu pembayaran (PENDING).'];
+    }
+
+    // ================================================================
+    // BAGIAN 3: WEBHOOK (dipanggil dari Controller, yang sudah validasi token)
+    // ================================================================
+
+    /**
+     * Proses payload webhook dari Xendit yang SUDAH divalidasi token-nya oleh controller.
+     * Controller cuma boleh validasi + panggil ini + return response -- semua logic bisnis di sini.
      */
     public function processWebhookPayload(array $payload): array
     {
@@ -116,47 +202,89 @@ class XenditService
         $trx = $this->xenditTransactionModel->where('external_id', $externalId)->first();
         if (!$trx) {
             log_message('warning', "Webhook Xendit: transaksi dengan external_id={$externalId} tidak ditemukan di database.");
+            $this->paymentLogModel->insert([
+                'invoice_id' => $payload['id'] ?? null,
+                'external_id' => $externalId,
+                'source' => 'WEBHOOK',
+                'new_status' => $status,
+                'response_json' => json_encode($payload),
+                'message' => 'Transaksi tidak ditemukan di database saat webhook diterima.',
+            ]);
             return ['success' => false, 'message' => 'Transaksi tidak ditemukan'];
         }
 
-        // Sudah pernah diproses sebelumnya -- jangan diproses dobel (misal Xendit kirim
-        // notifikasi yang sama 2x, atau statusnya PAID dikirim lagi setelah kita proses).
-        if ($trx['status'] === 'paid') {
-            return ['success' => true, 'message' => 'Transaksi sudah pernah diproses sebelumnya, dilewati.'];
-        }
-
         if ($status === 'EXPIRED') {
-            $this->xenditTransactionModel->update($trx['id_transaction'], ['status' => 'expired']);
+            if ($trx['status'] !== 'expired' && $trx['status'] !== 'paid') {
+                $this->xenditTransactionModel->update($trx['id_transaction'], ['status' => 'expired']);
+                $this->logPaymentChange($trx, null, 'WEBHOOK', $trx['status'], 'expired', ['data' => $payload], 'Invoice kedaluwarsa (dari webhook).');
+            }
             return ['success' => true, 'message' => 'Invoice kedaluwarsa, status diperbarui.'];
         }
 
         if ($status !== 'PAID') {
-            // Status lain (mis. PENDING) -- tidak ada yang perlu dilakukan
             return ['success' => true, 'message' => "Status {$status} diterima, tidak ada tindakan."];
         }
 
-        // ============= STATUS PAID: catat pembayaran & lunas-kan tagihan =============
-        $tagihanIds = json_decode($trx['tagihan_ids'], true) ?: [];
-        if (empty($tagihanIds)) {
-            return ['success' => false, 'message' => 'Data tagihan pada transaksi kosong/rusak.'];
-        }
+        $result = $this->updatePaymentAsPaid($trx, $this->normalisasiDataXendit($payload), 'WEBHOOK');
+        return $result;
+    }
 
-        $paymentChannel = $payload['payment_channel'] ?? ($payload['payment_method'] ?? 'XENDIT');
-        $paidAt = !empty($payload['paid_at']) ? date('Y-m-d H:i:s', strtotime($payload['paid_at'])) : date('Y-m-d H:i:s');
+    // ================================================================
+    // BAGIAN 4: METHOD TUNGGAL UNTUK MELUNASKAN PEMBAYARAN
+    // Dipanggil oleh: webhook, sync manual, DAN cron -- supaya logic-nya
+    // cuma ada di SATU tempat (tidak ada duplikasi/celah perbedaan perilaku).
+    // ================================================================
 
+    /**
+     * @param array $trx Baris xendit_transaction (harus sudah di-fetch sebelumnya)
+     * @param array $dataXendit Data yang SUDAH dinormalisasi lewat normalisasiDataXendit()
+     * @param string $source 'WEBHOOK' | 'MANUAL' | 'CRON'
+     */
+    public function updatePaymentAsPaid(array $trx, array $dataXendit, string $source): array
+    {
         $db = \Config\Database::connect();
         $db->transStart();
 
-        // Bagi total yang dibayar secara proporsional ke tiap tagihan (biasanya jumlahnya
-        // pas sama dengan sisa_tagihan masing-masing karena kita yang set amount invoice-nya,
-        // tapi tetap dihitung per tagihan untuk jaga-jaga & supaya rapi di riwayat pembayaran).
+        // ---------- IDEMPOTENCY: kunci baris ini & cek ulang statusnya SAAT INI JUGA ----------
+        // Ini penting karena antara webhook & sync manual/cron bisa saja "bentrok" nyaris
+        // bersamaan. FOR UPDATE mengunci baris supaya proses lain harus antre dulu.
+        $trxTerkini = $db->table('xendit_transaction')
+                         ->where('id_transaction', $trx['id_transaction'])
+                         ->get()
+                         ->getRowArray();
+
+        if (!$trxTerkini) {
+            $db->transComplete();
+            return ['success' => false, 'message' => 'Transaksi tidak ditemukan saat memproses.'];
+        }
+
+        if ($trxTerkini['status'] === 'paid') {
+            // Sudah diproses sebelumnya (mungkin oleh webhook yang datang lebih dulu, atau
+            // sync yang berjalan hampir bersamaan) -- JANGAN diproses lagi. Ini yang membuat
+            // seluruh alur ini aman dipanggil berkali-kali (idempotent).
+            $db->transComplete();
+            $this->logPaymentChange($trxTerkini, null, $source, 'paid', 'paid', ['data' => $dataXendit], 'Dilewati -- transaksi sudah lunas sebelumnya (idempotent guard).');
+            return ['success' => true, 'message' => 'Transaksi sudah pernah diproses sebelumnya, dilewati.'];
+        }
+
+        $tagihanIds = json_decode($trxTerkini['tagihan_ids'], true) ?: [];
+        if (empty($tagihanIds)) {
+            $db->transRollback();
+            $this->logPaymentChange($trxTerkini, null, $source, $trxTerkini['status'], $trxTerkini['status'], ['data' => $dataXendit], 'Gagal -- data tagihan pada transaksi kosong/rusak.');
+            return ['success' => false, 'message' => 'Data tagihan pada transaksi kosong/rusak.'];
+        }
+
+        $paidAt = $dataXendit['paid_at'] ?? date('Y-m-d H:i:s');
+        $paymentChannel = $dataXendit['payment_channel'] ?? 'XENDIT';
+        $lastIdPembayaran = null;
+
         foreach ($tagihanIds as $idTagihan) {
             $tagihan = $this->tagihanModel->find($idTagihan);
             if (!$tagihan || $tagihan['status_tagihan'] === 'lunas') {
-                continue; // sudah lunas duluan (mis. dibayar manual di kasir sebelum webhook masuk) -- lewati
+                continue; // sudah lunas duluan (mis. dibayar manual di kasir) -- lewati, bukan error
             }
 
-            $nominalBayar = (float) $tagihan['sisa_tagihan']; // lunasi penuh tagihan ini
+            $nominalBayar = (float) $tagihan['sisa_tagihan'];
 
             $this->pembayaranModel->insert([
                 'id_tagihan' => $idTagihan,
@@ -165,86 +293,197 @@ class XenditService
                 'nominal_bayar' => $nominalBayar,
                 'metode_pembayaran' => 'xendit',
                 'payment_channel' => $paymentChannel,
-                'xendit_invoice_id' => $trx['xendit_invoice_id'],
-                'keterangan' => 'Pembayaran online via Xendit (' . $paymentChannel . ')',
+                'xendit_invoice_id' => $trxTerkini['xendit_invoice_id'],
+                'keterangan' => 'Pembayaran online via Xendit (' . $paymentChannel . ') -- diproses via ' . $source,
                 'status_pembayaran' => 'valid',
-                'id_user' => null, // otomatis, tidak ada petugas yang input
+                'id_user' => null,
             ]);
+            $lastIdPembayaran = $this->pembayaranModel->getInsertID();
 
             $this->tagihanModel->addPayment($idTagihan, $nominalBayar);
 
-            usleep(10000); // jaga nomor kwitansi tetap unik kalau lebih dari 1 tagihan
+            usleep(10000); // jaga nomor kwitansi tetap unik kalau lebih dari 1 tagihan dalam 1 invoice
         }
 
-        $this->xenditTransactionModel->update($trx['id_transaction'], [
-            'status' => 'paid',
-            'payment_channel' => $paymentChannel,
-            'paid_at' => $paidAt,
-        ]);
+        // ---------- UPDATE STATUS DENGAN GUARD "WHERE status != 'paid'" ----------
+        // Guard tambahan di level query (bukan cuma cek PHP di atas) -- kalau ada race
+        // condition yang lolos dari FOR UPDATE (mis. beda koneksi DB), UPDATE ini tetap
+        // hanya akan kena 1x karena baris kedua tidak akan menemukan status pending lagi.
+        $db->table('xendit_transaction')
+           ->where('id_transaction', $trxTerkini['id_transaction'])
+           ->where('status !=', 'paid')
+           ->update([
+                'status' => 'paid',
+                'payment_channel' => $paymentChannel,
+                'xendit_payment_id' => $dataXendit['payment_id'] ?? null,
+                'paid_at' => $paidAt,
+                'last_synced_at' => date('Y-m-d H:i:s'),
+           ]);
+
+        $this->logPaymentChange($trxTerkini, $lastIdPembayaran, $source, $trxTerkini['status'], 'paid', ['data' => $dataXendit], 'Pembayaran berhasil dicatat.');
 
         $db->transComplete();
 
         if ($db->transStatus() === false) {
-            log_message('error', "Webhook Xendit: transaksi database gagal untuk external_id={$externalId}");
-            return ['success' => false, 'message' => 'Gagal menyimpan data pembayaran ke database.'];
+            log_message('error', "updatePaymentAsPaid: transaksi database gagal untuk external_id={$trxTerkini['external_id']}");
+            return ['success' => false, 'message' => 'Gagal menyimpan data pembayaran ke database (transaksi dibatalkan/rollback).'];
         }
 
         return ['success' => true, 'message' => 'Pembayaran berhasil dicatat.'];
     }
 
+    // ================================================================
+    // BAGIAN 5: LOGGING
+    // ================================================================
+
+    private function logPaymentChange(?array $trx, ?int $idPembayaran, string $source, ?string $oldStatus, ?string $newStatus, ?array $rawResult, string $message): void
+    {
+        try {
+            $this->paymentLogModel->insert([
+                'id_transaction' => $trx['id_transaction'] ?? null,
+                'id_pembayaran' => $idPembayaran,
+                'invoice_id' => $trx['xendit_invoice_id'] ?? null,
+                'external_id' => $trx['external_id'] ?? null,
+                'source' => $source,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+                'response_json' => $rawResult ? json_encode($rawResult) : null,
+                'message' => $message,
+            ]);
+        } catch (\Throwable $e) {
+            // Kegagalan mencatat log TIDAK BOLEH menggagalkan proses pembayaran utamanya --
+            // cukup catat ke log sistem biasa.
+            log_message('error', 'Gagal insert payment_logs: ' . $e->getMessage());
+        }
+    }
+
     /**
-     * Cek status transaksi berdasarkan external_id -- dipakai halaman "pembayaran selesai"
-     * untuk menampilkan status ke wali murid setelah diarahkan kembali dari Xendit.
+     * Catat SETIAP request webhook yang masuk (valid maupun ditolak) -- dipanggil dari Controller.
+     */
+    public function logWebhookRequest(array $headers, ?string $token, string $payload, string $validationResult, int $responseCode, string $responseBody, ?string $errorMessage = null): void
+    {
+        try {
+            // Jangan simpan header Authorization/sejenisnya kalau ada -- cuma perlu tahu token
+            // callback-nya (disimpan terpisah di kolom signature_token, bukan sengaja disamarkan
+            // di sini karena memang berguna untuk debugging token yang salah).
+            $this->paymentWebhookLogModel->insert([
+                'request_headers' => json_encode($headers),
+                'signature_token' => $token,
+                'payload' => $payload,
+                'validation_result' => $validationResult,
+                'response_code' => $responseCode,
+                'response_body' => $responseBody,
+                'error_message' => $errorMessage,
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'Gagal insert payment_webhook_logs: ' . $e->getMessage());
+        }
+    }
+
+    // ================================================================
+    // BAGIAN 6: HELPER
+    // ================================================================
+
+    /**
+     * Cek status transaksi berdasarkan external_id -- dipakai halaman "pembayaran selesai".
      */
     public function getTransactionStatus(string $externalId): ?array
     {
         return $this->xenditTransactionModel->where('external_id', $externalId)->first();
     }
 
+    /**
+     * Samakan bentuk data dari webhook payload ATAU dari respons GET invoice (field-nya
+     * kadang beda penamaan) jadi satu bentuk yang konsisten dipakai updatePaymentAsPaid().
+     */
+    private function normalisasiDataXendit(array $raw): array
+    {
+        return [
+            'payment_id' => $raw['payment_id'] ?? $raw['id'] ?? null,
+            'payment_channel' => $raw['payment_channel'] ?? $raw['payment_method'] ?? $raw['bank_code'] ?? 'XENDIT',
+            'paid_at' => !empty($raw['paid_at']) ? date('Y-m-d H:i:s', strtotime($raw['paid_at'])) : date('Y-m-d H:i:s'),
+        ];
+    }
+
     private function generateNomorKwitansi(): string
     {
         $prefix = 'KWT';
         $date = date('Ymd');
-
         $last = $this->pembayaranModel
             ->like('nomor_kwitansi', $prefix . $date, 'after')
             ->orderBy('id_pembayaran', 'DESC')
             ->first();
-
         $newNumber = $last ? ((int) substr($last['nomor_kwitansi'], -4) + 1) : 1;
-
         return $prefix . $date . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
     }
 
     /**
-     * Panggilan HTTP mentah ke API Xendit (pakai cURL bawaan PHP, tidak perlu SDK tambahan).
+     * Ubah hasil error teknis jadi pesan yang masuk akal ditampilkan ke user/admin.
      */
-    private function httpPost(string $endpoint, array $body): array
+    private function pesanErrorUntukUser(array $result): string
+    {
+        if (isset($result['error_type'])) {
+            $map = [
+                'timeout' => 'Koneksi ke Xendit terlalu lama (timeout). Coba lagi beberapa saat.',
+                'connection' => 'Tidak dapat terhubung ke server Xendit. Periksa koneksi internet server.',
+                'not_found' => 'Invoice tidak ditemukan di Xendit.',
+                'rate_limit' => 'Terlalu banyak permintaan ke Xendit dalam waktu singkat. Coba lagi sebentar lagi.',
+                'server_error' => 'Server Xendit sedang bermasalah. Coba lagi beberapa saat.',
+            ];
+            if (isset($map[$result['error_type']])) return $map[$result['error_type']];
+        }
+        return $result['error'] ?? 'Terjadi kesalahan saat menghubungi Xendit.';
+    }
+
+    // ================================================================
+    // BAGIAN 7: HTTP CLIENT KE API XENDIT
+    // ================================================================
+
+    private function httpRequest(string $method, string $endpoint, ?array $body = null): array
     {
         $ch = curl_init($this->config->apiBaseUrl . $endpoint);
-        curl_setopt_array($ch, [
+        $opts = [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($body),
+            CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
                 'Authorization: Basic ' . base64_encode($this->config->secretKey . ':'),
             ],
             CURLOPT_TIMEOUT => 30,
-        ]);
+            CURLOPT_CONNECTTIMEOUT => 10,
+        ];
+        if ($body !== null) {
+            $opts[CURLOPT_POSTFIELDS] = json_encode($body);
+        }
+        curl_setopt_array($ch, $opts);
+
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErrno = curl_errno($ch);
         $curlError = curl_error($ch);
         curl_close($ch);
 
+        // ---------- Tangani berbagai kondisi gagal koneksi ----------
+        if ($curlErrno === CURLE_OPERATION_TIMEDOUT) {
+            return ['success' => false, 'error_type' => 'timeout', 'error' => 'Timeout menghubungi Xendit: ' . $curlError];
+        }
         if ($response === false) {
-            return ['success' => false, 'error' => 'Koneksi ke Xendit gagal: ' . $curlError];
+            return ['success' => false, 'error_type' => 'connection', 'error' => 'Gagal terhubung ke Xendit: ' . $curlError];
         }
 
         $data = json_decode($response, true);
 
+        if ($httpCode === 404) {
+            return ['success' => false, 'error_type' => 'not_found', 'http_code' => 404, 'error' => 'Invoice tidak ditemukan', 'raw' => $data];
+        }
+        if ($httpCode === 429) {
+            return ['success' => false, 'error_type' => 'rate_limit', 'http_code' => 429, 'error' => 'Rate limit tercapai', 'raw' => $data];
+        }
+        if ($httpCode >= 500) {
+            return ['success' => false, 'error_type' => 'server_error', 'http_code' => $httpCode, 'error' => 'Server Xendit error', 'raw' => $data];
+        }
         if ($httpCode < 200 || $httpCode >= 300) {
-            return ['success' => false, 'http_code' => $httpCode, 'error' => $data['message'] ?? 'Permintaan ke Xendit ditolak', 'raw' => $data];
+            return ['success' => false, 'error_type' => 'client_error', 'http_code' => $httpCode, 'error' => $data['message'] ?? 'Permintaan ke Xendit ditolak', 'raw' => $data];
         }
 
         return ['success' => true, 'data' => $data];

@@ -301,6 +301,7 @@
     .toast.success { border-color: var(--success-border); color: #14532d; background: var(--success-bg); }
     .toast.error { border-color: var(--danger-border); color: #7f1d1d; background: var(--danger-bg); }
     .toast.warning { border-color: var(--warning-border); color: #78350f; background: var(--warning-bg); }
+    .toast.info { border-color: var(--info-border); color: #0c4a6e; background: var(--info-bg); }
     .toast i.icon { font-size: 16px; margin-top: 1px; }
     .toast .close { margin-left: auto; cursor: pointer; opacity: .5; }
     .toast .close:hover { opacity: 1; }
@@ -508,6 +509,9 @@
             <a href="<?= base_url('admin/pembayaran') ?>" class="nav-item <?= simaku_active('admin/pembayaran') ? 'active' : '' ?>">
                 <i class="fa-solid fa-wallet"></i> Pembayaran
             </a>
+            <a href="<?= base_url('admin/rekonsiliasi') ?>" class="nav-item <?= simaku_active('admin/rekonsiliasi') ? 'active' : '' ?>">
+                <i class="fa-solid fa-arrows-rotate"></i> Rekonsiliasi
+            </a>
             <a href="<?= base_url('admin/tagihan') ?>" class="nav-item <?= simaku_active('admin/tagihan') ? 'active' : '' ?>">
                 <i class="fa-solid fa-file-invoice-dollar"></i> Tagihan
             </a>
@@ -564,6 +568,7 @@
             <div class="nav-group-label">Keuangan</div>
             <a href="<?= base_url('admin/skema-tagihan') ?>" class="nav-item <?= simaku_active('skema-tagihan') ? 'active' : '' ?>"><i class="fa-solid fa-sitemap"></i> Skema Tagihan</a>
             <a href="<?= base_url('admin/beasiswa') ?>" class="nav-item <?= simaku_active('admin/beasiswa') ? 'active' : '' ?>"><i class="fa-solid fa-award"></i> Beasiswa</a>
+            <a href="<?= base_url('admin/rekonsiliasi') ?>" class="nav-item <?= simaku_active('admin/rekonsiliasi') ? 'active' : '' ?>"><i class="fa-solid fa-arrows-rotate"></i> Rekonsiliasi</a>
             <a href="<?= base_url('admin/laporan') ?>" class="nav-item <?= simaku_active('admin/laporan') ? 'active' : '' ?>"><i class="fa-solid fa-chart-line"></i> Laporan</a>
 
             <div class="nav-group-label">Akademik</div>

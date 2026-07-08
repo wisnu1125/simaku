@@ -196,6 +196,34 @@
 
     <div style="display:flex; flex-direction:column; gap:16px;">
         <div class="card">
+            <div class="section-title">
+                Payment Monitoring
+                <a href="<?= base_url('admin/rekonsiliasi') ?>">Kelola <i class="fa-solid fa-arrow-right"></i></a>
+            </div>
+            <div style="padding:16px 20px 4px; display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+                <div>
+                    <div style="font-size:19px; font-weight:900; color:var(--warning);"><?= number_format($payment_monitoring['pending']) ?></div>
+                    <div style="font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:700; letter-spacing:.3px;">Pending</div>
+                </div>
+                <div>
+                    <div style="font-size:19px; font-weight:900; color:var(--success);"><?= number_format($payment_monitoring['paid_hari_ini']) ?></div>
+                    <div style="font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:700; letter-spacing:.3px;">Lunas Hari Ini</div>
+                </div>
+                <div>
+                    <div style="font-size:19px; font-weight:900; color:<?= $payment_monitoring['webhook_gagal'] > 0 ? 'var(--danger)' : 'var(--ink)' ?>;"><?= number_format($payment_monitoring['webhook_gagal']) ?></div>
+                    <div style="font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:700; letter-spacing:.3px;">Webhook Gagal (24j)</div>
+                </div>
+                <div>
+                    <div style="font-size:19px; font-weight:900; color:<?= $payment_monitoring['perlu_sync'] > 0 ? '#c2410c' : 'var(--ink)' ?>;"><?= number_format($payment_monitoring['perlu_sync']) ?></div>
+                    <div style="font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:700; letter-spacing:.3px;">Perlu Sync</div>
+                </div>
+            </div>
+            <div style="padding:12px 20px 16px; font-size:11px; color:var(--muted); border-top:1px solid var(--border-soft); margin-top:12px;">
+                <i class="fa-solid fa-clock"></i> Sinkronisasi terakhir: <?= $payment_monitoring['sinkronisasi_terakhir'] ? date('d M Y, H:i', strtotime($payment_monitoring['sinkronisasi_terakhir'])) : 'Belum pernah' ?>
+            </div>
+        </div>
+
+        <div class="card">
             <div class="section-title">Status Tagihan</div>
             <div class="status-bars">
                 <?php

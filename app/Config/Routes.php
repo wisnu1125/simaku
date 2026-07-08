@@ -115,6 +115,13 @@ $routes->group('admin', ['filter' => 'auth'], function($routes) {
     $routes->get('pembayaran/get-tagihan-by-siswa', 'Admin\PembayaranController::getTagihanBySiswa');
     $routes->post('pembayaran/store-bulk', 'Admin\PembayaranController::storeBulk');
     
+    // Rekonsiliasi Pembayaran (sync manual/massal ke Xendit)
+    $routes->get('rekonsiliasi', 'Admin\RekonsiliasiController::index');
+    $routes->post('rekonsiliasi/sync/(:num)', 'Admin\RekonsiliasiController::sync/$1');
+    $routes->post('rekonsiliasi/sync-batch', 'Admin\RekonsiliasiController::syncBatch');
+    $routes->get('rekonsiliasi/pending-ids', 'Admin\RekonsiliasiController::pendingIds');
+    $routes->get('rekonsiliasi/logs/(:num)', 'Admin\RekonsiliasiController::logs/$1');
+    
     // Kenaikan Kelas
     $routes->get('kenaikan-kelas', 'Admin\KenaikanKelasController::index');
     $routes->get('kenaikan-kelas/form', 'Admin\KenaikanKelasController::form');

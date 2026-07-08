@@ -8,6 +8,8 @@ use App\Models\TagihanModel;
 use App\Models\PembayaranModel;
 use App\Models\TahunAjaranModel;
 use App\Models\KelasModel;
+use App\Models\XenditTransactionModel;
+use App\Models\PaymentWebhookLogModel;
 
 class DashboardController extends BaseController
 {
@@ -16,6 +18,8 @@ class DashboardController extends BaseController
     protected $pembayaranModel;
     protected $tahunAjaranModel;
     protected $kelasModel;
+    protected $xenditTransactionModel;
+    protected $paymentWebhookLogModel;
     
     public function __construct()
     {
@@ -24,6 +28,8 @@ class DashboardController extends BaseController
         $this->pembayaranModel = new PembayaranModel();
         $this->tahunAjaranModel = new TahunAjaranModel();
         $this->kelasModel = new KelasModel();
+        $this->xenditTransactionModel = new XenditTransactionModel();
+        $this->paymentWebhookLogModel = new PaymentWebhookLogModel();
     }
     
     /**
@@ -35,6 +41,45 @@ class DashboardController extends BaseController
         return ['Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni'];
     }
     
+    /**
+     * Data untuk widget "Payment Monitoring" -- ringkasan kesehatan sistem pembayaran
+     * online (Xendit), independen dari tahun ajaran (ini soal operasional teknis,
+     * bukan soal akademik per tahun ajaran).
+     */
+    private function computePaymentMonitoring(): array
+    {
+        $pending = $this->xenditTransactionModel->where('status', 'pending')->countAllResults();
+        
+        $paidHariIni = $this->xenditTransactionModel
+            ->where('status', 'paid')
+            ->where('DATE(paid_at)', date('Y-m-d'))
+            ->countAllResults();
+        
+        $webhookGagal = $this->paymentWebhookLogModel
+            ->whereIn('validation_result', ['INVALID_TOKEN', 'INVALID_PAYLOAD', 'ERROR'])
+            ->where('received_at >=', date('Y-m-d H:i:s', strtotime('-24 hours')))
+            ->countAllResults();
+        
+        // "Perlu sync" = pending yang belum PERNAH disinkronkan sama sekali (last_synced_at kosong)
+        $perluSync = $this->xenditTransactionModel
+            ->where('status', 'pending')
+            ->where('last_synced_at IS NULL')
+            ->countAllResults();
+        
+        $sinkronisasiTerakhir = $this->xenditTransactionModel
+            ->where('last_synced_at IS NOT NULL')
+            ->orderBy('last_synced_at', 'DESC')
+            ->first();
+        
+        return [
+            'pending' => $pending,
+            'paid_hari_ini' => $paidHariIni,
+            'webhook_gagal' => $webhookGagal,
+            'perlu_sync' => $perluSync,
+            'sinkronisasi_terakhir' => $sinkronisasiTerakhir['last_synced_at'] ?? null,
+        ];
+    }
+    
     public function index()
     {
         // Get tahun ajaran aktif -- SEMUA statistik di bawah ini disaring ke tahun ajaran
@@ -43,6 +88,7 @@ class DashboardController extends BaseController
         $idTA = $tahunAjaranAktif['id_tahun_ajaran'] ?? null;
         
         $db = \Config\Database::connect();
+        $paymentMonitoring = $this->computePaymentMonitoring();
         
         if (!$idTA) {
             // Tidak ada tahun ajaran aktif sama sekali -- tampilkan kosong daripada
@@ -54,6 +100,7 @@ class DashboardController extends BaseController
                 'status_tagihan' => ['lunas' => 0, 'cicil' => 0, 'belum_bayar' => 0],
                 'top_tunggakan' => [], 'pembayaran_terbaru' => [],
                 'bulan_berjalan' => null, 'status_per_kelas' => [],
+                'payment_monitoring' => $paymentMonitoring,
             ];
             return view('admin/dashboard/index', $data);
         }
@@ -249,6 +296,7 @@ class DashboardController extends BaseController
             'pembayaran_terbaru' => $pembayaranTerbaru,
             'bulan_berjalan' => $namaBulanSekarang,
             'status_per_kelas' => $statusPerKelas,
+            'payment_monitoring' => $paymentMonitoring,
         ];
         
         return view('admin/dashboard/index', $data);

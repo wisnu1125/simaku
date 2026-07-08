@@ -21,7 +21,9 @@ class XenditTransactionModel extends Model
         'status',
         'invoice_url',
         'payment_channel',
-        'paid_at'
+        'xendit_payment_id',
+        'paid_at',
+        'last_synced_at'
     ];
 
     protected $useTimestamps = false; // created_at diisi otomatis oleh DEFAULT CURRENT_TIMESTAMP di kolomnya
