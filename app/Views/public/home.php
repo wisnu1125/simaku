@@ -532,7 +532,17 @@
             <div class="info-header">Pusat Bantuan & Informasi</div>
             
             <div class="info-list">
-                
+
+                <div class="info-item">
+                    <div class="info-icon-box">
+                        <i class="fa-solid fa-wallet"></i>
+                    </div>
+                    <div class="info-content">
+                        <h4>Cara Pembayaran</h4>
+                        <p>Ada 3 cara: <strong>Bayar Online</strong> (QRIS/VA/E-Wallet, otomatis lunas), <strong>Transfer Bank</strong> (kirim bukti ke WA Bendahara), atau <strong>Tunai</strong> langsung ke Tata Usaha. Detail lengkap ada di halaman rincian tagihan setelah Anda cek NIS.</p>
+                    </div>
+                </div>
+
                 <div class="info-item">
                     <div class="info-icon-box">
                         <i class="fa-solid fa-user-gear"></i>

@@ -26,6 +26,15 @@ class DashboardController extends BaseController
         $this->kelasModel = new KelasModel();
     }
     
+    /**
+     * Urutan bulan tahun ajaran (Juli = awal, Juni = akhir) -- dipakai untuk
+     * menentukan "SPP bulan berjalan" vs "SPP bulan-bulan sebelumnya".
+     */
+    private function bulanAkademik(): array
+    {
+        return ['Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni'];
+    }
+    
     public function index()
     {
         // Get tahun ajaran aktif -- SEMUA statistik di bawah ini disaring ke tahun ajaran
@@ -44,6 +53,7 @@ class DashboardController extends BaseController
                 'pembayaran_hari_ini' => 0, 'chart_pembayaran' => [],
                 'status_tagihan' => ['lunas' => 0, 'cicil' => 0, 'belum_bayar' => 0],
                 'top_tunggakan' => [], 'pembayaran_terbaru' => [],
+                'bulan_berjalan' => null, 'status_per_kelas' => [],
             ];
             return view('admin/dashboard/index', $data);
         }
@@ -142,6 +152,89 @@ class DashboardController extends BaseController
                                   ->limit(6)
                                   ->findAll();
         
+        // ============= Status Pembayaran per Kelas (Daftar Ulang & SPP) =============
+        $bulanList = $this->bulanAkademik();
+        $n = (int) date('n');
+        $namaBulanSekarang = $bulanList[$n >= 7 ? $n - 7 : $n + 5];
+        $indexBulanSekarang = array_search($namaBulanSekarang, $bulanList);
+        $bulanSebelumnyaList = array_slice($bulanList, 0, $indexBulanSekarang); // kosong kalau bulan ini = Juli
+        $spBulanIniNama = 'SPP ' . mb_strtoupper($namaBulanSekarang);
+        $spSebelumnyaNama = array_map(fn ($b) => 'SPP ' . mb_strtoupper($b), $bulanSebelumnyaList);
+        
+        $kelasList = $this->kelasModel->where('id_tahun_ajaran', $idTA)->orderBy('nama_kelas', 'ASC')->findAll();
+        $statusPerKelas = [];
+        foreach ($kelasList as $k) {
+            $totalSiswaKelas = $this->siswaModel->where('id_kelas', $k['id_kelas'])->where('status_siswa', 'aktif')->countAllResults();
+            if ($totalSiswaKelas === 0) continue; // lewati kelas yang belum ada siswanya
+            
+            // Daftar siswa yang PUNYA tunggakan di kelas ini, dipecah 3 kategori:
+            // Daftar Ulang, SPP bulan berjalan, SPP bulan-bulan sebelumnya (bisa lebih dari 1 bulan).
+            $sppSebelumnyaCase = empty($spSebelumnyaNama)
+                ? '0'
+                : 'SUM(CASE WHEN jt.nama_tagihan IN (' . implode(',', array_map(fn ($x) => $db->escape($x), $spSebelumnyaNama)) . ") AND t.status_tagihan != 'lunas' THEN 1 ELSE 0 END)";
+            
+            $sppSebelumnyaInList = empty($spSebelumnyaNama)
+                ? "''"
+                : implode(',', array_map(fn ($x) => $db->escape($x), $spSebelumnyaNama));
+            
+            $siswaTunggakan = $db->table('siswa s')
+                ->select("s.id_siswa, s.nama_lengkap, s.nis,
+                          SUM(CASE WHEN jt.grup_tagihan='DAFTAR ULANG' AND jt.nama_tagihan != 'SPP JULI' AND t.status_tagihan != 'lunas' THEN 1 ELSE 0 END) as jml_du,
+                          SUM(CASE WHEN jt.nama_tagihan=" . $db->escape($spBulanIniNama) . " AND t.status_tagihan != 'lunas' THEN 1 ELSE 0 END) as belum_bulan_ini,
+                          {$sppSebelumnyaCase} as jml_sebelumnya,
+                          SUM(CASE WHEN t.status_tagihan != 'lunas' AND (
+                                (jt.grup_tagihan='DAFTAR ULANG' AND jt.nama_tagihan != 'SPP JULI')
+                                OR jt.nama_tagihan=" . $db->escape($spBulanIniNama) . "
+                                OR jt.nama_tagihan IN ({$sppSebelumnyaInList})
+                              ) THEN t.sisa_tagihan ELSE 0 END) as total_rp", false)
+                ->join('tagihan t', 't.id_siswa = s.id_siswa')
+                ->join('jenis_tagihan jt', 'jt.id_jenis_tagihan = t.id_jenis_tagihan')
+                ->where('s.id_kelas', $k['id_kelas'])
+                ->where('s.status_siswa', 'aktif')
+                ->where('t.status_tagihan !=', 'lunas')
+                ->groupStart()
+                    ->where('jt.grup_tagihan', 'DAFTAR ULANG')
+                    ->orLike('jt.nama_tagihan', 'SPP ', 'after')
+                ->groupEnd()
+                ->groupBy('s.id_siswa')
+                ->having('jml_du >', 0)
+                ->orHaving('belum_bulan_ini >', 0)
+                ->orHaving('jml_sebelumnya >', 0)
+                ->orderBy('s.nama_lengkap', 'ASC')
+                ->get()->getResultArray();
+            
+            $siswaLunasSemua = max(0, $totalSiswaKelas - count($siswaTunggakan));
+            
+            // Untuk siswa yang muncul di daftar tunggakan ini, cek juga apakah mereka
+            // punya tunggakan dari tahun ajaran LAIN (bukan yang sedang aktif) -- misalnya
+            // siswa naik kelas tapi masih ada sisa tagihan dari tahun sebelumnya.
+            if (!empty($siswaTunggakan)) {
+                $idSiswaList = array_column($siswaTunggakan, 'id_siswa');
+                $tunggakanLaluRows = $db->table('tagihan')
+                    ->select('id_siswa, SUM(sisa_tagihan) as total_lalu', false)
+                    ->whereIn('id_siswa', $idSiswaList)
+                    ->where('id_tahun_ajaran !=', $idTA)
+                    ->where('status_tagihan !=', 'lunas')
+                    ->groupBy('id_siswa')
+                    ->get()->getResultArray();
+                $tunggakanLaluMap = array_column($tunggakanLaluRows, 'total_lalu', 'id_siswa');
+                
+                foreach ($siswaTunggakan as &$s) {
+                    $s['tunggakan_lalu'] = (float) ($tunggakanLaluMap[$s['id_siswa']] ?? 0);
+                }
+                unset($s);
+            }
+            
+            $statusPerKelas[] = [
+                'id_kelas' => $k['id_kelas'],
+                'nama_kelas' => $k['nama_kelas'],
+                'total_siswa' => $totalSiswaKelas,
+                'lunas_semua' => $siswaLunasSemua,
+                'persen_lunas' => round($siswaLunasSemua / $totalSiswaKelas * 100),
+                'siswa_tunggakan' => $siswaTunggakan,
+            ];
+        }
+        
         $data = [
             'title' => 'Dashboard',
             'tahun_ajaran_aktif' => $tahunAjaranAktif,
@@ -153,9 +246,55 @@ class DashboardController extends BaseController
             'chart_pembayaran' => $chartPembayaran,
             'status_tagihan' => $statusTagihan,
             'top_tunggakan' => $topTunggakan,
-            'pembayaran_terbaru' => $pembayaranTerbaru
+            'pembayaran_terbaru' => $pembayaranTerbaru,
+            'bulan_berjalan' => $namaBulanSekarang,
+            'status_per_kelas' => $statusPerKelas,
         ];
         
         return view('admin/dashboard/index', $data);
+    }
+    
+    /**
+     * AJAX: daftar nama siswa yang belum lunas di 1 kelas, dipecah per kategori
+     * (Daftar Ulang / SPP bulan berjalan / SPP bulan sebelumnya). Dipanggil saat
+     * baris kelas di-klik/expand di dashboard.
+     */
+    public function kelasDetail($idKelas)
+    {
+        $db = \Config\Database::connect();
+        $bulanList = $this->bulanAkademik();
+        $namaBulanSekarang = $bulanList[(int) date('n') >= 7 ? (int) date('n') - 7 : (int) date('n') + 5];
+        $indexBulanSekarang = array_search($namaBulanSekarang, $bulanList);
+        $bulanSebelumnyaList = array_slice($bulanList, 0, $indexBulanSekarang);
+        $spBulanIniNama = 'SPP ' . mb_strtoupper($namaBulanSekarang);
+        $spSebelumnyaNama = array_map(fn ($b) => 'SPP ' . mb_strtoupper($b), $bulanSebelumnyaList);
+        
+        $ambilNama = function (callable $applyWhere) use ($db, $idKelas) {
+            $q = $db->table('tagihan t')
+                ->select('DISTINCT s.id_siswa, s.nama_lengkap, s.nis')
+                ->join('siswa s', 's.id_siswa = t.id_siswa')
+                ->join('jenis_tagihan jt', 'jt.id_jenis_tagihan = t.id_jenis_tagihan')
+                ->where('t.id_kelas', $idKelas)
+                ->where('t.status_tagihan !=', 'lunas');
+            $applyWhere($q);
+            return $q->orderBy('s.nama_lengkap', 'ASC')->get()->getResultArray();
+        };
+        
+        $daftarUlang = $ambilNama(function ($q) {
+            $q->where('jt.grup_tagihan', 'DAFTAR ULANG')->where('jt.nama_tagihan !=', 'SPP JULI');
+        });
+        $sppBulanIni = $ambilNama(function ($q) use ($spBulanIniNama) {
+            $q->where('jt.nama_tagihan', $spBulanIniNama);
+        });
+        $sppSebelumnya = empty($spSebelumnyaNama) ? [] : $ambilNama(function ($q) use ($spSebelumnyaNama) {
+            $q->whereIn('jt.nama_tagihan', $spSebelumnyaNama);
+        });
+        
+        return $this->response->setJSON([
+            'daftar_ulang' => $daftarUlang,
+            'spp_bulan_ini' => $sppBulanIni,
+            'spp_sebelumnya' => $sppSebelumnya,
+            'bulan_berjalan' => $namaBulanSekarang,
+        ]);
     }
 }

@@ -64,6 +64,31 @@
 .recent-row .title { font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .recent-row .sub { font-size: 11px; color: var(--muted); }
 .recent-row .amount { font-size: 12.5px; font-weight: 800; color: var(--success); flex-shrink: 0; font-family: 'Roboto Mono', monospace; }
+
+.kelas-section { margin-top: 16px; }
+.kelas-grid { display: grid; grid-template-columns: 1fr; gap: 14px; padding: 16px 20px 20px; }
+@media (min-width: 640px) { .kelas-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1300px) { .kelas-grid { grid-template-columns: repeat(3, 1fr); } }
+.kelas-card { border: 1px solid var(--border-soft); border-radius: var(--r-lg); overflow: hidden; }
+.kelas-card-head { padding: 14px 16px; border-bottom: 1px solid var(--border-soft); background: var(--border-soft); }
+.kelas-card-head .top-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.kelas-card-head .nama { font-size: 13.5px; font-weight: 800; color: var(--ink); }
+.kelas-card-head .count { font-size: 11px; color: var(--muted); font-weight: 700; flex-shrink: 0; }
+.kelas-card-body { max-height: 280px; overflow-y: auto; }
+.siswa-tunggakan-row { padding: 10px 16px; border-bottom: 1px solid var(--border-soft); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.siswa-tunggakan-row:last-child { border-bottom: none; }
+.siswa-tunggakan-row .info { min-width: 0; }
+.siswa-tunggakan-row .nama { font-size: 12.5px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.siswa-tunggakan-row .nis { font-size: 10.5px; color: var(--muted); font-family: 'Roboto Mono', monospace; }
+.siswa-tunggakan-row .tags { display: flex; gap: 4px; flex-shrink: 0; }
+.tag-mini { font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 999px; white-space: nowrap; }
+.tag-du { background: var(--danger-bg); color: var(--danger); }
+.tag-spp-ini { background: var(--warning-bg); color: #92400e; }
+.tag-spp-lalu { background: var(--danger-bg); color: var(--danger); }
+.tag-ta-lalu { background: #f3e8ff; color: #7e22ce; }
+.kelas-card-empty { padding: 20px 16px; text-align: center; color: var(--success); font-size: 12px; }
+.progress-track { height: 6px; border-radius: 999px; background: var(--surface); overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 999px; transition: width .3s ease; }
 </style>
 
 <div class="welcome-row">
@@ -213,6 +238,51 @@
             <?php endif; ?>
         </div>
     </div>
+</div>
+
+<!-- ===================== Status Pembayaran per Kelas ===================== -->
+<div class="card kelas-section">
+    <div class="section-title">
+        Status Pembayaran per Kelas
+        <?php if ($bulan_berjalan): ?><span class="badge badge-brand"><i class="fa-solid fa-calendar-day"></i> Bulan Berjalan: <?= esc($bulan_berjalan) ?></span><?php endif; ?>
+    </div>
+    <?php if (empty($status_per_kelas)): ?>
+        <div class="empty-state"><i class="fa-solid fa-chalkboard"></i><p>Belum ada data kelas untuk tahun ajaran ini.</p></div>
+    <?php else: ?>
+        <div class="kelas-grid">
+            <?php foreach ($status_per_kelas as $k): ?>
+            <div class="kelas-card">
+                <div class="kelas-card-head">
+                    <div class="top-row">
+                        <span class="nama"><?= esc($k['nama_kelas']) ?></span>
+                        <span class="count"><?= $k['lunas_semua'] ?>/<?= $k['total_siswa'] ?> lunas</span>
+                    </div>
+                    <div class="progress-track"><div class="progress-fill" style="width:<?= $k['persen_lunas'] ?>%; background:<?= $k['persen_lunas'] >= 80 ? 'var(--success)' : ($k['persen_lunas'] >= 50 ? 'var(--warning)' : 'var(--danger)') ?>;"></div></div>
+                </div>
+                <div class="kelas-card-body">
+                    <?php if (empty($k['siswa_tunggakan'])): ?>
+                        <div class="kelas-card-empty"><i class="fa-solid fa-circle-check"></i> Semua siswa sudah lunas</div>
+                    <?php else: ?>
+                        <?php foreach ($k['siswa_tunggakan'] as $s): ?>
+                        <div class="siswa-tunggakan-row">
+                            <div class="info">
+                                <div class="nama"><?= esc($s['nama_lengkap']) ?></div>
+                                <div class="nis">NIS <?= esc($s['nis']) ?> · <span style="color:var(--danger); font-weight:700;">Rp <?= number_format($s['total_rp'], 0, ',', '.') ?></span></div>
+                            </div>
+                            <div class="tags">
+                                <?php if ($s['jml_du'] > 0): ?><span class="tag-mini tag-du">DU ×<?= (int) $s['jml_du'] ?></span><?php endif; ?>
+                                <?php if ($s['belum_bulan_ini'] > 0): ?><span class="tag-mini tag-spp-ini">SPP <?= esc($bulan_berjalan) ?></span><?php endif; ?>
+                                <?php if ($s['jml_sebelumnya'] > 0): ?><span class="tag-mini tag-spp-lalu">SPP Lalu ×<?= (int) $s['jml_sebelumnya'] ?></span><?php endif; ?>
+                                <?php if (!empty($s['tunggakan_lalu']) && $s['tunggakan_lalu'] > 0): ?><span class="tag-mini tag-ta-lalu">TA Lalu: Rp <?= number_format($s['tunggakan_lalu'], 0, ',', '.') ?></span><?php endif; ?>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
 </div>
 
 <script>

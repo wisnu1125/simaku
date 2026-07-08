@@ -18,6 +18,8 @@ class PembayaranModel extends Model
         'tanggal_bayar',
         'nominal_bayar',
         'metode_pembayaran',
+        'payment_channel',
+        'xendit_invoice_id',
         'keterangan',
         'status_pembayaran',
         'alasan_batal',

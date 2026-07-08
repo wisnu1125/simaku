@@ -1,0 +1,87 @@
+<?php
+
+namespace App\Controllers\Public;
+
+use App\Controllers\BaseController;
+use App\Services\XenditService;
+use Config\Xendit as XenditConfig;
+
+class XenditController extends BaseController
+{
+    protected $xenditService;
+
+    public function __construct()
+    {
+        $this->xenditService = new XenditService();
+    }
+
+    /**
+     * Dipanggil via AJAX dari halaman "Detail Tagihan" publik saat wali murid klik
+     * "Bayar Online" setelah memilih tagihan yang mau dibayar. Sengaja balas JSON
+     * (bukan redirect) karena halaman asalnya cuma bisa diakses lewat POST -- kalau
+     * pakai redirect biasa, tidak ada cara balik ke sana tanpa submit ulang NIS+tanggal lahir.
+     */
+    public function bayar()
+    {
+        $idSiswa = (int) $this->request->getPost('id_siswa');
+        $idTagihan = $this->request->getPost('id_tagihan'); // array id_tagihan yang dicentang
+
+        if (!$idSiswa || empty($idTagihan) || !is_array($idTagihan)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Pilih minimal 1 tagihan yang mau dibayar.']);
+        }
+
+        $result = $this->xenditService->createInvoiceForSiswa($idSiswa, array_map('intval', $idTagihan));
+
+        return $this->response->setJSON($result);
+    }
+
+    /**
+     * Halaman setelah wali murid selesai (atau membatalkan) proses pembayaran di
+     * halaman Xendit -- ini yang jadi success_redirect_url saat invoice dibuat.
+     * Catatan: status PASTI di sini bisa saja belum "paid" kalau webhook dari Xendit
+     * belum sampai duluan -- makanya pesannya dibuat netral, bukan langsung "berhasil".
+     */
+    public function selesai(string $externalId)
+    {
+        $trx = $this->xenditService->getTransactionStatus($externalId);
+
+        return view('public/pembayaran_selesai', [
+            'title' => 'Status Pembayaran',
+            'trx' => $trx,
+        ]);
+    }
+
+    /**
+     * Endpoint webhook -- didaftarkan di Dashboard Xendit > Settings > Webhooks.
+     * URL: https://domain-anda.com/xendit/webhook
+     */
+    public function webhook()
+    {
+        $config = new XenditConfig();
+        $tokenDiterima = $this->request->getHeaderLine('X-Callback-Token');
+
+        // Kalau webhook token belum diatur di .env, tolak semua webhook demi keamanan
+        // (daripada diam-diam menerima notifikasi palsu dari pihak yang tidak dikenal).
+        if (empty($config->webhookToken)) {
+            log_message('error', 'Webhook Xendit ditolak: webhookToken belum diatur di .env');
+            return $this->response->setStatusCode(500)->setJSON(['error' => 'Webhook belum dikonfigurasi di server']);
+        }
+
+        if (!$tokenDiterima || !hash_equals($config->webhookToken, $tokenDiterima)) {
+            log_message('warning', 'Webhook Xendit ditolak: X-Callback-Token tidak cocok.');
+            return $this->response->setStatusCode(401)->setJSON(['error' => 'Token tidak valid']);
+        }
+
+        $payload = $this->request->getJSON(true);
+        if (!$payload) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Payload tidak valid']);
+        }
+
+        $result = $this->xenditService->processWebhookPayload($payload);
+
+        // Selalu balas 200 kalau payload berhasil DIPROSES (walau isinya "dilewati karena
+        // sudah pernah") -- supaya Xendit tidak terus mencoba mengirim ulang. Cuma balas
+        // status lain kalau memang ada error di sisi kita.
+        return $this->response->setStatusCode($result['success'] ? 200 : 500)->setJSON($result);
+    }
+}

@@ -1,3 +1,8 @@
+<?php
+// GANTI nomor ini dengan WhatsApp Bendahara sekolah (format: 62xxx tanpa + atau 0 di depan)
+$waBendahara = '628xxxxxxxxxx';
+$waBendaharaLink = 'https://wa.me/' . $waBendahara . '?text=' . urlencode('Assalamualaikum, saya ingin konfirmasi pembayaran atas nama ' . ($siswa['nama_lengkap'] ?? '') . ' (NIS ' . ($siswa['nis'] ?? '') . ')');
+?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -35,7 +40,19 @@
             --radius: 16px;
             --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
             --modal-overlay: rgba(0, 0, 0, 0.5);
+            --warning: #d97706;
+            --warning-light: #fffbeb;
         }
+        .payment-method-card { margin-bottom: 16px; }
+        .payment-method-item { display: flex; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+        .payment-method-item:last-child { border-bottom: none; }
+        .pm-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px; }
+        .pm-body { flex: 1; min-width: 0; }
+        .pm-title { font-size: 13.5px; font-weight: 700; color: var(--text-main); margin-bottom: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .pm-tag { font-size: 9.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: .3px; }
+        .pm-desc { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+        .pm-rekening { display: inline-flex; align-items: center; gap: 8px; background: var(--bg-body); border: 1px dashed var(--border); border-radius: 8px; padding: 8px 12px; margin-top: 8px; font-family: monospace; font-size: 13px; font-weight: 700; color: var(--text-main); }
+        .pm-wa-btn { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; background: #25D366; color: #fff; font-size: 12px; font-weight: 700; padding: 8px 14px; border-radius: 8px; text-decoration: none; }
 
         * {
             margin: 0;
@@ -390,7 +407,10 @@
             padding: 16px 24px;
             border-top: 1px solid var(--border);
             background: #f8fafc;
+            display: flex;
+            flex-direction: column;
         }
+        .modal-footer-btns { display: flex; gap: 10px; }
 
         /* CHECKBOX ITEM DI DALAM MODAL */
         .check-item {
@@ -438,9 +458,9 @@
         .td-amount { font-size: 20px; font-weight: 800; color: var(--primary); }
 
         .btn-done {
-            width: 100%;
-            background: var(--primary);
-            color: white;
+            flex: 1;
+            background: #e2e8f0;
+            color: var(--text-main);
             border: none;
             padding: 14px;
             border-radius: 12px;
@@ -448,6 +468,7 @@
             font-size: 14px;
             cursor: pointer;
         }
+        #btnBayarOnlineModal { flex: 1.6; }
 
         /* History Styles */
         .history-list {
@@ -517,15 +538,6 @@
         </div>
     </div>
     
-    <div class="disclaimer-box info-theme">
-        <div class="d-icon"><i class="fa-solid fa-circle-info"></i></div>
-        <div class="d-text">
-            <b>Informasi Pembayaran:</b><br>
-            Status pembayaran akan diperbarui sistem dalam waktu maksimal <b>3x24 jam setelah mengirimkan bukti pembayaran ke nomor WhatsApp Bendahara Sekolah</b>. 
-            Jika status Anda belum berubah atau terdapat kesalahan, silakan segera hubungi <b>Tata Usaha (TU)</b> atau <b>Bendahara Sekolah</b>.
-        </div>
-    </div>
-
     <div class="header-card">
         <h2 class="student-name"><?= esc($siswa['nama_lengkap']) ?></h2>
         
@@ -540,18 +552,16 @@
             <?php endif; ?>
         </div>
 
-        <div class="va-card">
-            <div class="va-title">Rekening Pembayaran (BSI)</div>
-            <div class="va-code"><?= esc($siswa['virtual_account']) ?></div>
-            <div style="font-size: 10px; color: #64748b; margin-top: 4px;">a.n. SMPIT Wahdatul Ummah</div>
-        </div>
+        <a href="<?= base_url('print-kartu/' . $siswa['id_siswa'] . '/' . $tahun_ajaran_aktif) ?>" class="btn btn-primary" style="width:100%; padding:12px;">
+            <i class="fa-solid fa-download"></i> Download Kartu
+        </a>
 
-        <div class="action-buttons">
+        <div class="action-buttons" style="margin-top:10px;">
             <a href="<?= base_url() ?>" class="btn btn-back">
                 <i class="fa-solid fa-arrow-left"></i> Kembali
             </a>
-            <a href="<?= base_url('print-kartu/' . $siswa['id_siswa'] . '/' . $tahun_ajaran_aktif) ?>" class="btn btn-primary">
-                <i class="fa-solid fa-download"></i> Download Kartu
+            <a href="#cara-bayar" class="btn btn-primary">
+                <i class="fa-solid fa-circle-question"></i> Cara Bayar?
             </a>
         </div>
     </div>
@@ -636,6 +646,44 @@
         <div class="stat-box">
             <div class="stat-title">Belum Terbayar</div>
             <div class="stat-num text-red">Rp <?= number_format($totalTunggakanTampil, 0, ',', '.') ?></div>
+        </div>
+    </div>
+
+    <div class="section-box payment-method-card" id="cara-bayar">
+        <div class="section-title">
+            <i class="fa-solid fa-wallet"></i> Cara Pembayaran
+        </div>
+
+        <div class="payment-method-item">
+            <div class="pm-icon" style="background:#f1f5f9; color:var(--text-muted);"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+            <div class="pm-body">
+                <div class="pm-title">1. Tunai di Sekolah</div>
+                <div class="pm-desc">Bayar langsung ke bagian Tata Usaha/Bendahara sekolah pada jam kerja. Kwitansi akan langsung diberikan saat itu juga.</div>
+            </div>
+        </div>
+
+        <div class="payment-method-item">
+            <div class="pm-icon" style="background:var(--warning-light); color:var(--warning);"><i class="fa-solid fa-building-columns"></i></div>
+            <div class="pm-body">
+                <div class="pm-title">2. Transfer Bank <span class="pm-tag" style="background:var(--warning-light); color:var(--warning);">Verifikasi Manual</span></div>
+                <div class="pm-desc">
+                    Transfer ke rekening sekolah, lalu kirim bukti transfer ke WhatsApp Bendahara agar segera diverifikasi.
+                    <div class="pm-rekening"><i class="fa-solid fa-university"></i> BSI 7132600001 <span style="font-weight:400; color:var(--text-muted);">a.n. SMPIT Wahdatul Ummah</span></div>
+                    <br>
+                    <a href="<?= esc($waBendaharaLink) ?>" target="_blank" class="pm-wa-btn"><i class="fa-brands fa-whatsapp"></i> Kirim Bukti ke WA Bendahara</a>
+                    <div style="margin-top:10px; padding:10px 12px; background:var(--warning-light); border-radius:8px; font-size:11.5px; color:var(--warning); line-height:1.5;">
+                        <i class="fa-solid fa-clock"></i> Status pembayaran diperbarui sistem maksimal <strong>3×24 jam</strong> setelah bukti dikirim. Kalau lewat dari itu belum berubah, segera hubungi Tata Usaha (TU) atau Bendahara.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="payment-method-item">
+            <div class="pm-icon" style="background:var(--primary-light); color:var(--primary-dark);"><i class="fa-solid fa-qrcode"></i></div>
+            <div class="pm-body">
+                <div class="pm-title">3. Bayar Online <span class="pm-tag" style="background:var(--success-light); color:var(--success);">Verifikasi Instan</span></div>
+                <div class="pm-desc">Pilih tagihan di bawah, lalu tekan tombol <strong>"Bayar Online"</strong> yang muncul. Bisa pakai QRIS, Virtual Account, atau E-Wallet. Tagihan otomatis lunas begitu pembayaran berhasil — tidak perlu kirim bukti apa pun.</div>
+            </div>
         </div>
     </div>
 
@@ -724,7 +772,7 @@
                             $listBelumLunas[] = $t;
                             // Data untuk modal kalkulator
                             $billsForModal[] = [
-                                'id' => uniqid(),
+                                'id_tagihan' => $t['id_tagihan'],
                                 'name' => $t['nama_tagihan'],
                                 'nominal' => $t['sisa_tagihan'],
                                 'month' => $t['bulan_tagihan']
@@ -831,8 +879,8 @@
                         <div class="card-footer-action">
                             <button class="btn-calc-full" 
                                     onclick='openCalcModal(<?= htmlspecialchars($jsonBills, ENT_QUOTES, 'UTF-8') ?>, "<?= esc($tahun) ?>")'>
-                                <i class="fa-solid fa-calculator"></i>
-                                Hitung Beberapa Tagihan
+                                <i class="fa-solid fa-qrcode"></i>
+                                Bayar Online / Hitung Tagihan
                             </button>
                         </div>
                     </div>
@@ -984,15 +1032,61 @@
         </div>
         <div class="modal-body" id="modalList">
             </div>
+        <div id="bayarOnlineError" style="display:none; margin:0 0 12px; padding:10px 12px; background:#fef2f2; color:#dc2626; border-radius:8px; font-size:12px;"></div>
         <div class="modal-footer">
             <div class="total-display">
                 <span class="td-label">Total Dipilih</span>
                 <span class="td-amount" id="modalTotalAmount">Rp 0</span>
             </div>
-            <button class="btn-done" onclick="closeCalcModal()">Selesai</button>
+            <div class="modal-footer-btns">
+                <button class="btn-done" onclick="closeCalcModal()" id="btnTutupModal">Selesai</button>
+                <button class="btn btn-primary" id="btnBayarOnlineModal" style="display:none;" onclick="prosesBayarOnline()">
+                    <i class="fa-solid fa-qrcode"></i> Bayar Online
+                </button>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+    function prosesBayarOnline() {
+        const checked = document.querySelectorAll('.modal-checkbox:checked');
+        if (checked.length === 0) return;
+
+        const btn = document.getElementById('btnBayarOnlineModal');
+        const btnTutup = document.getElementById('btnTutupModal');
+        const errBox = document.getElementById('bayarOnlineError');
+        errBox.style.display = 'none';
+        btn.disabled = true;
+        btnTutup.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses…';
+
+        const formData = new FormData();
+        formData.append('id_siswa', '<?= (int) $siswa['id_siswa'] ?>');
+        checked.forEach(c => formData.append('id_tagihan[]', c.dataset.id));
+
+        fetch('<?= base_url('xendit/bayar') ?>', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.invoice_url) {
+                    window.location.href = data.invoice_url;
+                } else {
+                    errBox.textContent = data.message || 'Gagal memproses pembayaran. Silakan coba lagi.';
+                    errBox.style.display = 'block';
+                    btn.disabled = false;
+                    btnTutup.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-qrcode"></i> Bayar Online';
+                }
+            })
+            .catch(() => {
+                errBox.textContent = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
+                errBox.style.display = 'block';
+                btn.disabled = false;
+                btnTutup.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-qrcode"></i> Bayar Online';
+            });
+    }
+</script>
 
 <script>
     // Fungsi untuk Toggle Show More/Less
@@ -1052,7 +1146,7 @@
             // Generate HTML for item
             // Checkbox checked by default
             el.innerHTML = `
-                <input type="checkbox" class="modal-checkbox" value="${item.nominal}" checked onchange="calculateModalTotal()">
+                <input type="checkbox" class="modal-checkbox" value="${item.nominal}" data-id="${item.id_tagihan}" checked onchange="calculateModalTotal()">
                 <div class="custom-checkbox">
                     <i class="fa-solid fa-check"></i>
                 </div>
@@ -1084,6 +1178,11 @@
         });
 
         document.getElementById('modalTotalAmount').textContent = formatRupiah(total).replace('Rp', 'Rp ');
+
+        // Tombol Bayar Online cuma tampil kalau ada minimal 1 tagihan dicentang
+        const btnBayar = document.getElementById('btnBayarOnlineModal');
+        btnBayar.style.display = checkboxes.length > 0 ? 'inline-flex' : 'none';
+        document.getElementById('bayarOnlineError').style.display = 'none';
     }
 
     function closeCalcModal() {

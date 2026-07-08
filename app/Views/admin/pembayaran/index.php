@@ -129,7 +129,7 @@
         <?php endforeach; ?>
     </select>
     <select class="input" id="fStatus"><option value="">Semua Status</option><option value="valid">Valid</option><option value="dibatalkan">Dibatalkan</option></select>
-    <select class="input" id="fMetode"><option value="">Semua Metode</option><option value="tunai">Tunai</option><option value="transfer">Transfer</option></select>
+    <select class="input" id="fMetode"><option value="">Semua Metode</option><option value="tunai">Tunai</option><option value="transfer">Transfer</option><option value="xendit">Online (Xendit)</option></select>
 </div>
 
 <div class="card" style="overflow:hidden;">
@@ -156,7 +156,10 @@ function esc(str) { const d = document.createElement('div'); d.textContent = str
 function fmt(n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 function fmtDateTime(d) { const dt = new Date(d.replace(' ', 'T')); return dt.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' · ' + dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }); }
 function fmtDateShort(d) { const dt = new Date(d.replace(' ', 'T')); return dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }); }
-function metodeBadge(m) { return m === 'tunai' ? '<span class="badge badge-success">Tunai</span>' : '<span class="badge badge-info">Transfer</span>'; }
+function metodeBadge(p) {
+    if (p.metode_pembayaran === 'xendit') return '<span class="badge badge-brand"><i class="fa-solid fa-qrcode"></i> ' + esc(p.payment_channel || 'Online') + '</span>';
+    return p.metode_pembayaran === 'tunai' ? '<span class="badge badge-success">Tunai</span>' : '<span class="badge badge-info">Transfer</span>';
+}
 function statusBadge(s) { return s === 'valid' ? '<span class="badge badge-success">Valid</span>' : '<span class="badge badge-danger">Batal</span>'; }
 
 function showSkeleton() {
@@ -209,7 +212,7 @@ async function loadPage() {
                 <td><div style="font-weight:700;color:var(--ink);">${esc(p.nama_siswa)}</div><div style="font-size:11.5px;color:var(--muted);">NIS ${esc(p.nis)}</div></td>
                 <td>${esc(p.nama_tagihan)}</td>
                 <td style="text-align:right; font-family:'Roboto Mono',monospace; font-weight:700;">Rp ${fmt(p.nominal_bayar)}</td>
-                <td>${metodeBadge(p.metode_pembayaran)}</td>
+                <td>${metodeBadge(p)}</td>
                 <td>${statusBadge(p.status_pembayaran)}</td>
                 <td style="text-align:right;"><a class="icon-action" href="${BASE_URL}/admin/pembayaran/detail/${p.id_pembayaran}" title="Detail"><i class="fa-solid fa-eye"></i></a></td>
             </tr>`).join('');
@@ -218,7 +221,7 @@ async function loadPage() {
                 <div class="body">
                     <div class="name">${esc(p.nama_siswa)}</div>
                     <div class="meta">${esc(p.nama_tagihan)} · ${fmtDateShort(p.tanggal_bayar)}</div>
-                    <div style="margin-top:5px;">${statusBadge(p.status_pembayaran)} ${metodeBadge(p.metode_pembayaran)}</div>
+                    <div style="margin-top:5px;">${statusBadge(p.status_pembayaran)} ${metodeBadge(p)}</div>
                 </div>
                 <div class="amount" style="color:${p.status_pembayaran === 'valid' ? 'var(--success)' : 'var(--danger)'};">Rp ${fmt(p.nominal_bayar)}</div>
             </a>`).join('');

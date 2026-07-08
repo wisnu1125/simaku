@@ -15,6 +15,11 @@ $routes->get('home/searchSiswa', 'Public\HomeController::searchSiswa');
 $routes->post('cek-tagihan', 'Public\HomeController::cekTagihan');
 $routes->get('print-kartu/(:num)/(:num)', 'Public\HomeController::printKartu/$1/$2');
 
+// Pembayaran online (Xendit)
+$routes->post('xendit/bayar', 'Public\XenditController::bayar');
+$routes->get('cek-tagihan/pembayaran-selesai/(:segment)', 'Public\XenditController::selesai/$1');
+$routes->post('xendit/webhook', 'Public\XenditController::webhook');
+
 // =====================================================
 // AUTH ROUTES
 // =====================================================
@@ -33,6 +38,7 @@ $routes->group('admin', ['filter' => 'auth'], function($routes) {
     
     // Dashboard
     $routes->get('dashboard', 'Admin\DashboardController::index');
+    $routes->get('dashboard/kelas-detail/(:num)', 'Admin\DashboardController::kelasDetail/$1');
     
     // Tahun Ajaran
     $routes->get('tahun-ajaran', 'Admin\TahunAjaranController::index');

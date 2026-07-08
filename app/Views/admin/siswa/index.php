@@ -311,7 +311,7 @@ function showSkeleton() {
     let html = '';
     for (let i = 0; i < 4; i++) html += '<div class="skeleton-row"><div class="skeleton-bar" style="width:60%;"></div><div class="skeleton-bar" style="width:35%;"></div></div>';
     document.getElementById('cardList').innerHTML = html;
-    document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" style="padding:0;">' + html + '</td></tr>';
+    document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" style="padding:0;">' + html + '</td></tr>';
 }
 
 async function loadPage() {

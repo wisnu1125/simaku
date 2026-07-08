@@ -69,7 +69,10 @@
         <?php if ($pembayaran['keterangan']): ?>
         <div class="info-row"><span class="k">Keterangan</span><span class="v"><?= nl2br(esc($pembayaran['keterangan'])) ?></span></div>
         <?php endif; ?>
-        <div class="info-row"><span class="k">Petugas</span><span class="v"><?= esc($pembayaran['nama_petugas']) ?></span></div>
+        <div class="info-row"><span class="k">Petugas</span><span class="v"><?= $pembayaran['nama_petugas'] ? esc($pembayaran['nama_petugas']) : '<span style="color:var(--brand);"><i class="fa-solid fa-robot"></i> Otomatis (Xendit)</span>' ?></span></div>
+        <?php if ($pembayaran['metode_pembayaran'] === 'xendit'): ?>
+        <div class="info-row"><span class="k">Channel Pembayaran</span><span class="v"><?= esc($pembayaran['payment_channel'] ?? '-') ?></span></div>
+        <?php endif; ?>
     </div>
 
     <div class="action-row">
