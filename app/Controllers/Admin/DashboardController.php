@@ -100,6 +100,7 @@ class DashboardController extends BaseController
                 'status_tagihan' => ['lunas' => 0, 'cicil' => 0, 'belum_bayar' => 0],
                 'top_tunggakan' => [], 'pembayaran_terbaru' => [],
                 'bulan_berjalan' => null, 'status_per_kelas' => [],
+                'siswa_tanpa_kelas_tunggakan' => [],
                 'payment_monitoring' => $paymentMonitoring,
             ];
             return view('admin/dashboard/index', $data);
@@ -282,6 +283,25 @@ class DashboardController extends BaseController
             ];
         }
         
+        // ============= Siswa TANPA kelas yang masih punya tunggakan =============
+        // Kenapa perlu terpisah dari "Status Pembayaran per Kelas" di atas: bagian itu
+        // strukturnya per-kelas (loop tiap kelas), jadi siswa yang TIDAK punya kelas sama
+        // sekali -- paling sering ini siswa yang sudah LULUS atau NONAKTIF -- tidak akan
+        // pernah muncul di situ, walau mereka masih berutang. Supaya tidak "hilang begitu
+        // saja" dari pantauan, dicek terpisah di sini. Sengaja TIDAK dibatasi tahun ajaran
+        // aktif saja, karena utang siswa yang sudah lulus biasanya justru dari tahun ajaran
+        // sebelumnya (saat mereka masih aktif).
+        $siswaTanpaKelasTunggakan = $db->table('siswa s')
+            ->select("s.id_siswa, s.nis, s.nama_lengkap, s.status_siswa,
+                      SUM(t.sisa_tagihan) as total_tunggakan,
+                      COUNT(*) as jml_tagihan", false)
+            ->join('tagihan t', 't.id_siswa = s.id_siswa')
+            ->where('s.id_kelas', null)
+            ->where('t.status_tagihan !=', 'lunas')
+            ->groupBy('s.id_siswa')
+            ->orderBy('total_tunggakan', 'DESC')
+            ->get()->getResultArray();
+        
         $data = [
             'title' => 'Dashboard',
             'tahun_ajaran_aktif' => $tahunAjaranAktif,
@@ -296,6 +316,7 @@ class DashboardController extends BaseController
             'pembayaran_terbaru' => $pembayaranTerbaru,
             'bulan_berjalan' => $namaBulanSekarang,
             'status_per_kelas' => $statusPerKelas,
+            'siswa_tanpa_kelas_tunggakan' => $siswaTanpaKelasTunggakan,
             'payment_monitoring' => $paymentMonitoring,
         ];
         

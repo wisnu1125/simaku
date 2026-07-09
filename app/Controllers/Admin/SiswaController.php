@@ -89,9 +89,17 @@ class SiswaController extends BaseController
         
         // Statistik ringkas -- ikut disaring tahun ajaran yang sama (bukan status/kelas/pencarian),
         // supaya angka di kartu ringkasan konsisten dengan tahun ajaran yang sedang dilihat.
+        // Siswa tanpa kelas (biasanya sudah lulus/nonaktif) tetap ikut terhitung, dengan alasan
+        // yang sama seperti di applySiswaFilters().
         $statsBase = function () use ($fTA) {
             $m = new SiswaModel();
-            if ($fTA) $m->join('kelas', 'kelas.id_kelas = siswa.id_kelas', 'left')->where('kelas.id_tahun_ajaran', $fTA);
+            if ($fTA) {
+                $m->join('kelas', 'kelas.id_kelas = siswa.id_kelas', 'left')
+                  ->groupStart()
+                      ->where('kelas.id_tahun_ajaran', $fTA)
+                      ->orWhere('siswa.id_kelas', null)
+                  ->groupEnd();
+            }
             return $m;
         };
         $stats = [
@@ -133,14 +141,25 @@ class SiswaController extends BaseController
                     ->orLike('siswa.nis', $q)
                     ->groupEnd();
         }
-        if (!empty($fKelas)) {
+        if ($fKelas === '__tanpa_kelas__') {
+            // Filter khusus: siswa yang memang tidak punya kelas sama sekali (paling sering
+            // ini siswa yang sudah lulus atau nonaktif dan sudah dikeluarkan dari kelasnya).
+            $builder->where('siswa.id_kelas', null);
+        } elseif (!empty($fKelas)) {
             $builder->where('kelas.nama_kelas', $fKelas);
         }
         if (!empty($fStatus)) {
             $builder->where('siswa.status_siswa', $fStatus);
         }
         if (!empty($fTA)) {
-            $builder->where('kelas.id_tahun_ajaran', $fTA);
+            // PENTING: siswa tanpa kelas (id_kelas NULL) HARUS tetap ikut ditampilkan meski
+            // filter tahun ajaran aktif -- kalau tidak, siswa yang sudah lulus/nonaktif dan
+            // tidak lagi punya kelas akan selalu tersembunyi setiap kali filter TA dipakai,
+            // padahal mereka bukan "tidak termasuk TA ini", cuma memang sudah tidak berkelas.
+            $builder->groupStart()
+                        ->where('kelas.id_tahun_ajaran', $fTA)
+                        ->orWhere('siswa.id_kelas', null)
+                    ->groupEnd();
         }
     }
     
@@ -380,7 +399,7 @@ class SiswaController extends BaseController
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Data Siswa');
         
-        $headers = ['NIS*', 'NISN', 'Nama Lengkap*', 'Tanggal Lahir* (YYYY-MM-DD)', 'Jenis Kelamin* (L/P)', 'Kelas', 'Nama Wali', 'No. Telepon Wali', 'Alamat', 'Virtual Account'];
+        $headers = ['NIS*', 'NISN', 'Nama Lengkap*', 'Tanggal Lahir* (YYYY-MM-DD)', 'Jenis Kelamin* (L/P)', 'Kelas', 'Nama Wali', 'No. Telepon Wali', 'Alamat'];
         $lastColIndex = count($headers) - 1;
         $lastCol = chr(65 + $lastColIndex);
         
@@ -394,12 +413,12 @@ class SiswaController extends BaseController
         
         // Baris contoh (ditandai jelas supaya dihapus sebelum benar-benar diimpor)
         $contohKelas = $kelasList[0]['nama_kelas'] ?? '';
-        $sheet->fromArray(['2024999', '0012345678', 'Contoh Nama Siswa', '2012-05-14', 'L', $contohKelas, 'Nama Wali Contoh', '081234567890', 'Alamat contoh', ''], null, 'A2');
+        $sheet->fromArray(['2024999', '0012345678', 'Contoh Nama Siswa', '2012-05-14', 'L', $contohKelas, 'Nama Wali Contoh', '081234567890', 'Alamat contoh'], null, 'A2');
         $sheet->getStyle('A2:' . $lastCol . '2')->getFont()->setItalic(true)->getColor()->setRGB('94A3B8');
         
         // Kolom yang rawan salah format kalau dianggap angka oleh Excel (NIS/NISN/telepon
         // bisa kehilangan angka 0 di depan) -- paksa jadi format Teks.
-        foreach (['A', 'B', 'H', 'J'] as $col) {
+        foreach (['A', 'B', 'H'] as $col) {
             $sheet->getStyle($col . '2:' . $col . '1000')->getNumberFormat()->setFormatCode('@');
         }
         

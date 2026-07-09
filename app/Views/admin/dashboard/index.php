@@ -313,6 +313,28 @@
     <?php endif; ?>
 </div>
 
+<?php if (!empty($siswa_tanpa_kelas_tunggakan)): ?>
+<div class="card" style="margin-top:16px; border-left:4px solid #7e22ce;">
+    <div class="section-title">
+        <i class="fa-solid fa-user-clock" style="color:#7e22ce;"></i> Siswa Tanpa Kelas dengan Tunggakan
+        <a href="<?= base_url('admin/siswa?kelas=__tanpa_kelas__') ?>">Lihat di Data Siswa <i class="fa-solid fa-arrow-right"></i></a>
+    </div>
+    <p style="padding:0 20px 14px; margin-top:-6px; font-size:12px; color:var(--muted);">
+        Biasanya siswa yang sudah lulus atau nonaktif dan sudah dikeluarkan dari kelasnya, tapi masih ada tagihan yang belum lunas. Tidak muncul di "Status Pembayaran per Kelas" di atas karena memang sudah tidak berkelas.
+    </p>
+    <?php foreach ($siswa_tanpa_kelas_tunggakan as $s): ?>
+    <div class="recent-row">
+        <div class="recent-avatar" style="background:#f3e8ff; color:#7e22ce;"><?= esc(strtoupper(substr($s['nama_lengkap'] ?? '?', 0, 1))) ?></div>
+        <div class="body">
+            <div class="title"><?= esc($s['nama_lengkap']) ?></div>
+            <div class="sub">NIS <?= esc($s['nis']) ?> · <?= $s['status_siswa'] === 'lulus' ? 'Lulus' : 'Nonaktif' ?> · <?= (int) $s['jml_tagihan'] ?> tagihan belum lunas</div>
+        </div>
+        <div class="amount" style="color:var(--danger);">Rp <?= number_format($s['total_tunggakan'], 0, ',', '.') ?></div>
+    </div>
+    <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <script>
 const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
 let selectedTagihan = [];

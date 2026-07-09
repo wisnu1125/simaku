@@ -216,7 +216,7 @@
 <div class="toolbar">
     <div class="search-wrap">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" class="input" id="q" placeholder="Cari nama, NIS, atau VA…">
+        <input type="text" class="input" id="q" placeholder="Cari nama atau NIS…">
     </div>
     <select class="input" id="fTA">
         <option value="">Semua Tahun Ajaran</option>
@@ -226,6 +226,7 @@
     </select>
     <select class="input" id="fKelas">
         <option value="">Semua Kelas</option>
+        <option value="__tanpa_kelas__">— Tanpa Kelas —</option>
         <?php foreach ($kelas_list as $k): ?>
             <option value="<?= esc($k['nama_kelas']) ?>"><?= esc($k['nama_kelas']) ?></option>
         <?php endforeach; ?>
@@ -272,6 +273,17 @@ const TAHUN_AJARAN = <?= json_encode($tahun_ajaran, JSON_HEX_TAG | JSON_HEX_APOS
 let page = 1;
 const PER_PAGE = 12;
 let q = '', fTA = '', fKelas = '', fStatus = '';
+
+// Kalau dibuka lewat link yang bawa parameter filter (mis. dari kartu "Siswa Tanpa Kelas
+// dengan Tunggakan" di Dashboard), langsung terapkan filternya begitu halaman dibuka --
+// supaya tidak perlu pilih manual lagi dari dropdown.
+(function () {
+    const urlParams = new URLSearchParams(location.search);
+    if (urlParams.has('kelas')) fKelas = urlParams.get('kelas');
+    if (urlParams.has('status')) fStatus = urlParams.get('status');
+    if (urlParams.has('ta')) fTA = urlParams.get('ta');
+})();
+
 let currentRows = [];
 let fetchToken = 0;
 
@@ -402,6 +414,12 @@ document.getElementById('q').addEventListener('input', function () {
 document.getElementById('fTA').addEventListener('change', function () { fTA = this.value; page = 1; loadPage(); });
 document.getElementById('fKelas').addEventListener('change', function () { fKelas = this.value; page = 1; loadPage(); });
 document.getElementById('fStatus').addEventListener('change', function () { fStatus = this.value; page = 1; loadPage(); });
+
+// Tampilkan di dropdown-nya juga (bukan cuma diterapkan diam-diam) kalau ada filter yang
+// terbaca dari URL saat halaman dibuka.
+if (fKelas) document.getElementById('fKelas').value = fKelas;
+if (fStatus) document.getElementById('fStatus').value = fStatus;
+if (fTA) document.getElementById('fTA').value = fTA;
 
 // ===================== MODAL: Tambah / Edit =====================
 function resetForm() {

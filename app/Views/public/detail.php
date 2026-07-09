@@ -527,6 +527,9 @@ $waBendaharaLink = 'https://wa.me/' . $waBendahara . '?text=' . urlencode('Assal
         .h-date { font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px; }
         .h-title { font-size: 13px; font-weight: 600; color: var(--text-main); display: block; line-height: 1.2; }
         .h-subtitle { font-size: 11px; color: var(--text-muted); }
+        .h-ta-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-top: 4px; }
+        .h-ta-badge.is-current { background: var(--primary-light); color: var(--primary-dark); }
+        .h-ta-badge.is-past { background: #fef3c7; color: #92400e; }
         .h-amount { text-align: right; font-size: 13px; font-weight: 700; color: var(--success); }
         .kwitansi-small { font-size: 9px; background: #f1f5f9; padding: 2px 5px; border-radius: 6px; color: var(--text-muted); border: 1px solid #e2e8f0; }
 
@@ -1048,13 +1051,22 @@ $waBendaharaLink = 'https://wa.me/' . $waBendahara . '?text=' . urlencode('Assal
         <?php else: ?>
             <div class="history-list">
                 <div id="historyContainer">
+                    <?php
+                    // Nama tahun ajaran yang sedang AKTIF -- dipakai buat bandingkan tiap baris riwayat,
+                    // supaya bisa dikasih penanda beda warna kalau pembayaran itu dari tahun sebelumnya.
+                    $namaTahunAktif = null;
+                    foreach ($daftar_tahun_ajaran as $ta) {
+                        if ($ta['id_tahun_ajaran'] == $tahun_ajaran_aktif) { $namaTahunAktif = $ta['nama_tahun_ajaran']; break; }
+                    }
+                    ?>
                     <?php $count = 0; ?>
                     <?php foreach ($pembayaran as $p): ?>
                         <?php 
                             $count++; 
                             $isHidden = ($count > 5) ? 'hidden-row' : ''; 
-                            $iconClass = ($p['metode_pembayaran'] === 'tunai') ? 'tunai' : 'transfer';
-                            $icon = ($p['metode_pembayaran'] === 'tunai') ? 'fa-money-bill' : 'fa-building-columns';
+                            $iconMap = ['tunai' => ['tunai', 'fa-money-bill'], 'xendit' => ['transfer', 'fa-qrcode'], 'transfer' => ['transfer', 'fa-building-columns']];
+                            [$iconClass, $icon] = $iconMap[$p['metode_pembayaran']] ?? ['transfer', 'fa-building-columns'];
+                            $isTahunAktif = ($namaTahunAktif !== null && $p['nama_tahun_ajaran'] === $namaTahunAktif);
                         ?>
                         <div class="history-item <?= $isHidden ?>">
                             <div class="h-icon <?= $iconClass ?>">
@@ -1065,7 +1077,10 @@ $waBendaharaLink = 'https://wa.me/' . $waBendahara . '?text=' . urlencode('Assal
                                     <?= date('d/m/Y H:i', strtotime($p['tanggal_bayar'])) ?> • <span class="kwitansi-small"><?= esc($p['nomor_kwitansi']) ?></span>
                                 </span>
                                 <span class="h-title"><?= esc($p['nama_tagihan']) ?></span>
-                                <span class="h-subtitle"><?= esc($p['nama_tahun_ajaran']) ?></span>
+                                <span class="h-ta-badge <?= $isTahunAktif ? 'is-current' : 'is-past' ?>">
+                                    <?php if (!$isTahunAktif): ?><i class="fa-solid fa-clock-rotate-left"></i><?php endif; ?>
+                                    <?= esc($p['nama_tahun_ajaran']) ?>
+                                </span>
                             </div>
                             <div class="h-amount">
                                 +<?= number_format($p['nominal_bayar'], 0, ',', '.') ?>
