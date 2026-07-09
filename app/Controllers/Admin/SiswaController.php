@@ -131,7 +131,6 @@ class SiswaController extends BaseController
             $builder->groupStart()
                     ->like('siswa.nama_lengkap', $q)
                     ->orLike('siswa.nis', $q)
-                    ->orLike('siswa.virtual_account', $q)
                     ->groupEnd();
         }
         if (!empty($fKelas)) {
@@ -167,18 +166,10 @@ class SiswaController extends BaseController
             'tanggal_lahir' => 'required|valid_date[d-m-Y]',
             'jenis_kelamin' => 'required|in_list[L,P]',
             'id_kelas' => 'permit_empty|integer',
-            'virtual_account' => 'permit_empty|max_length[20]'
         ];
         
         if (!$this->validate($rules)) {
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
-        }
-        
-        // Generate Virtual Account jika tidak diisi manual
-        $virtualAccount = $this->request->getPost('virtual_account');
-        if (empty($virtualAccount)) {
-            // Auto-generate VA
-            $virtualAccount = $this->siswaService->generateVirtualAccount();
         }
         
         $data = [
@@ -191,7 +182,6 @@ class SiswaController extends BaseController
             'nama_wali' => $this->request->getPost('nama_wali'),
             'telp_wali' => $this->request->getPost('telp_wali'),
             'id_kelas' => $this->request->getPost('id_kelas') ?: null,
-            'virtual_account' => $virtualAccount,
             'status_siswa' => 'aktif'
         ];
         
@@ -205,10 +195,10 @@ class SiswaController extends BaseController
             'data_baru' => json_encode($data),
             'ip_address' => $this->request->getIPAddress(),
             'user_agent' => $this->request->getUserAgent()->getAgentString(),
-            'keterangan' => 'Menambah siswa: ' . $data['nama_lengkap'] . ' (VA: ' . $virtualAccount . ')'
+            'keterangan' => 'Menambah siswa: ' . $data['nama_lengkap']
         ]);
         
-        return redirect()->to(base_url('admin/siswa'))->with('success', 'Siswa berhasil ditambahkan dengan VA: ' . $virtualAccount);
+        return redirect()->to(base_url('admin/siswa'))->with('success', 'Siswa berhasil ditambahkan');
     }
     
     /**
@@ -290,7 +280,6 @@ class SiswaController extends BaseController
             'jenis_kelamin' => 'required|in_list[L,P]',
             'status_siswa' => 'required|in_list[aktif,nonaktif,lulus]',
             'id_kelas' => 'permit_empty|integer',
-            'virtual_account' => "required|max_length[20]"
         ];
         
         if (!$this->validate($rules)) {
@@ -307,7 +296,6 @@ class SiswaController extends BaseController
             'nama_wali' => $this->request->getPost('nama_wali'),
             'telp_wali' => $this->request->getPost('telp_wali'),
             'id_kelas' => $this->request->getPost('id_kelas') ?: null,
-            'virtual_account' => $this->request->getPost('virtual_account'),
             'status_siswa' => $this->request->getPost('status_siswa')
         ];
         
@@ -322,7 +310,7 @@ class SiswaController extends BaseController
             'data_baru' => json_encode($data),
             'ip_address' => $this->request->getIPAddress(),
             'user_agent' => $this->request->getUserAgent()->getAgentString(),
-            'keterangan' => 'Mengupdate siswa: ' . $data['nama_lengkap'] . ' (VA: ' . $data['virtual_account'] . ')'
+            'keterangan' => 'Mengupdate siswa: ' . $data['nama_lengkap']
         ]);
         
         return redirect()->to(base_url('admin/siswa'))->with('success', 'Siswa berhasil diupdate');
@@ -526,7 +514,6 @@ class SiswaController extends BaseController
             $namaWali = trim((string) $sheet->getCell('G' . $row)->getCalculatedValue());
             $telpWali = trim((string) $sheet->getCell('H' . $row)->getCalculatedValue());
             $alamat = trim((string) $sheet->getCell('I' . $row)->getCalculatedValue());
-            $virtualAccount = trim((string) $sheet->getCell('J' . $row)->getCalculatedValue());
             
             // Baris kosong total (bukan bagian dari data, biasanya sisa baris kosong di akhir file) -> lewati diam-diam
             if ($nis === '' && $namaLengkap === '') {
@@ -558,14 +545,6 @@ class SiswaController extends BaseController
                 }
             }
             
-            // Virtual Account boleh sama antar siswa (memang disengaja, bukan bug) -- jadi di sini
-            // tidak dicek duplikat sama sekali, cukup dibersihkan formatnya saja.
-            if ($virtualAccount !== '') {
-                $virtualAccount = preg_replace('/\.0$/', '', $virtualAccount);
-            } else {
-                $virtualAccount = $this->siswaService->generateVirtualAccount();
-            }
-            
             $data = [
                 'nis' => $nis,
                 'nisn' => $nisn ?: null,
@@ -576,7 +555,6 @@ class SiswaController extends BaseController
                 'nama_wali' => $namaWali ?: null,
                 'telp_wali' => $telpWali ?: null,
                 'id_kelas' => $idKelas,
-                'virtual_account' => $virtualAccount,
                 'status_siswa' => 'aktif'
             ];
             

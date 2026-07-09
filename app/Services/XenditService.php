@@ -72,6 +72,20 @@ class XenditService
             return ['success' => false, 'message' => 'Tagihan yang dipilih tidak valid atau sudah lunas.'];
         }
 
+        // ---------- Cek dulu: apakah siswa ini SUDAH punya invoice pending yang masih aktif? ----------
+        // Kalau ada, JANGAN buat invoice baru -- arahkan ke invoice yang lama saja. Ini mencegah
+        // 1 siswa punya banyak invoice pending menumpuk kalau berkali-kali klik "Bayar Online"
+        // tanpa menyelesaikan/membatalkan yang sebelumnya.
+        $existingPending = $this->findActivePendingInvoice($idSiswa);
+        if ($existingPending) {
+            return [
+                'success' => true,
+                'invoice_url' => $existingPending['invoice_url'],
+                'reused' => true,
+                'message' => 'Anda masih punya pembayaran yang belum selesai, melanjutkan ke situ.',
+            ];
+        }
+
         $externalId = 'SIMAKU-' . date('YmdHis') . '-' . $idSiswa . '-' . bin2hex(random_bytes(3));
 
         $payload = [
@@ -102,6 +116,12 @@ class XenditService
             'status' => 'pending',
             'invoice_url' => $invoice['invoice_url'] ?? null,
         ]);
+
+        $idTransactionBaru = $this->xenditTransactionModel->getInsertID();
+        $this->logPaymentChange(
+            ['id_transaction' => $idTransactionBaru, 'xendit_invoice_id' => $invoice['id'], 'external_id' => $externalId],
+            null, 'MANUAL', null, 'pending', ['data' => $invoice], 'Invoice dibuat.'
+        );
 
         return ['success' => true, 'invoice_url' => $invoice['invoice_url'] ?? null];
     }
@@ -147,10 +167,17 @@ class XenditService
             return ['success' => false, 'changed' => false, 'message' => 'Transaksi tidak ditemukan di database.'];
         }
 
-        // Sudah final (paid/expired/failed) -- tidak perlu tanya ke Xendit lagi, cuma buang-buang API call.
-        // "failed" tetap boleh di-sync ulang siapa tahu statusnya berubah, tapi paid & expired sudah pasti final.
-        if ($trx['status'] === 'paid') {
-            return ['success' => true, 'changed' => false, 'message' => 'Transaksi ini sudah lunas sebelumnya.'];
+        // Sudah final -- tidak perlu tanya ke Xendit lagi, cuma buang-buang API call.
+        // "failed" tetap boleh di-sync ulang siapa tahu statusnya berubah, tapi paid/cancelled/
+        // needs_review sudah pasti final dari sisi kita (needs_review sengaja butuh admin yang
+        // menyelesaikan lewat halaman Rekonsiliasi, bukan di-sync otomatis lagi).
+        if (in_array($trx['status'], ['paid', 'cancelled', 'needs_review'], true)) {
+            $pesanMap = [
+                'paid' => 'Transaksi ini sudah lunas sebelumnya.',
+                'cancelled' => 'Transaksi ini sudah dibatalkan sebelumnya.',
+                'needs_review' => 'Transaksi ini menunggu peninjauan admin, tidak disinkronkan otomatis.',
+            ];
+            return ['success' => true, 'changed' => false, 'message' => $pesanMap[$trx['status']]];
         }
 
         $result = $this->getInvoiceStatus($trx['xendit_invoice_id']);
@@ -171,7 +198,7 @@ class XenditService
             return ['success' => $prosesResult['success'], 'changed' => $prosesResult['success'], 'message' => $prosesResult['message']];
         }
 
-        if ($statusBaru === 'expired' && $trx['status'] !== 'expired') {
+        if ($statusBaru === 'expired' && !in_array($trx['status'], ['expired', 'cancelled', 'needs_review'], true)) {
             $this->xenditTransactionModel->update($idTransaction, ['status' => 'expired']);
             $this->logPaymentChange($trx, null, $source, $trx['status'], 'expired', $result, 'Invoice kedaluwarsa (dari sync).');
             return ['success' => true, 'changed' => true, 'message' => 'Invoice sudah kedaluwarsa.'];
@@ -180,6 +207,95 @@ class XenditService
         // Masih PENDING di Xendit juga -- tidak ada perubahan
         $this->logPaymentChange($trx, null, $source, $trx['status'], $trx['status'], $result, 'Status masih PENDING, tidak ada perubahan.');
         return ['success' => true, 'changed' => false, 'message' => 'Status masih menunggu pembayaran (PENDING).'];
+    }
+
+    /**
+     * Cari invoice PENDING milik siswa ini yang masih dalam masa berlaku (belum lewat
+     * invoice_duration sejak dibuat). Dipakai untuk (a) mencegah invoice dobel saat wali
+     * murid klik "Bayar Online" berkali-kali, dan (b) tampilan "Pembayaran Tertunda" di
+     * halaman Cek Tagihan.
+     */
+    public function findActivePendingInvoice(int $idSiswa): ?array
+    {
+        $batasKedaluwarsa = date('Y-m-d H:i:s', time() - $this->config->invoiceDurationSeconds);
+
+        return $this->xenditTransactionModel
+            ->where('id_siswa', $idSiswa)
+            ->where('status', 'pending')
+            ->where('created_at >', $batasKedaluwarsa)
+            ->orderBy('created_at', 'DESC')
+            ->first();
+    }
+
+    // ================================================================
+    // BAGIAN 2.5: PEMBATALAN INVOICE
+    // ================================================================
+
+    /**
+     * Batalkan invoice yang masih PENDING. Alurnya:
+     *   1. Coba expire invoice-nya di Xendit dulu (kalau API-nya mendukung/berhasil).
+     *   2. APAPUN hasilnya di Xendit (berhasil ATAU gagal/tidak didukung), tetap lanjutkan
+     *      pembatalan di sisi SIMAKU -- supaya wali murid tidak "terjebak" gara-gara
+     *      Xendit menolak, sementara mereka memang niat batal & mau bayar ulang.
+     *   3. Data invoice TIDAK PERNAH dihapus -- cuma diubah status jadi 'cancelled'.
+     *
+     * @param string $cancelledBy 'wali_murid' (dari halaman publik) atau nama/username admin
+     */
+    public function cancelInvoice(int $idTransaction, string $cancelledBy): array
+    {
+        $trx = $this->xenditTransactionModel->find($idTransaction);
+        if (!$trx) {
+            return ['success' => false, 'message' => 'Transaksi tidak ditemukan.'];
+        }
+
+        if ($trx['status'] !== 'pending') {
+            return ['success' => false, 'message' => 'Transaksi ini sudah tidak berstatus pending (statusnya: ' . $trx['status'] . '), tidak bisa dibatalkan lagi.'];
+        }
+
+        // ---------- Langkah 1: coba expire di Xendit ----------
+        $this->logPaymentChange($trx, null, 'CANCEL', $trx['status'], $trx['status'], null, 'Mengirim permintaan pembatalan (expire) ke Xendit...');
+        $hasilXendit = $this->expireInvoiceAtXendit($trx['xendit_invoice_id']);
+
+        if ($hasilXendit['success']) {
+            $this->logPaymentChange($trx, null, 'CANCEL', $trx['status'], $trx['status'], $hasilXendit, 'Xendit berhasil meng-expire invoice.');
+        } else {
+            // Xendit menolak/tidak mendukung -- BUKAN dianggap gagal, cukup dicatat, tetap lanjut.
+            $this->logPaymentChange($trx, null, 'CANCEL', $trx['status'], $trx['status'], $hasilXendit, 'Xendit tidak bisa/tidak mendukung pembatalan invoice ini (' . ($hasilXendit['error'] ?? '-') . '), tetap lanjut membatalkan di SIMAKU.');
+        }
+
+        // ---------- Langkah 2: batalkan di SIMAKU (SELALU dilakukan, apapun hasil Xendit) ----------
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        $updated = $db->table('xendit_transaction')
+            ->where('id_transaction', $idTransaction)
+            ->where('status', 'pending') // guard idempotency, sama pola dengan updatePaymentAsPaid()
+            ->update([
+                'status' => 'cancelled',
+                'cancelled_at' => date('Y-m-d H:i:s'),
+                'cancelled_by' => $cancelledBy,
+            ]);
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return ['success' => false, 'message' => 'Gagal menyimpan pembatalan ke database.'];
+        }
+
+        $this->logPaymentChange($trx, null, 'CANCEL', 'pending', 'cancelled', null, 'Invoice dibatalkan oleh ' . $cancelledBy . '.');
+
+        return ['success' => true, 'message' => 'Pembayaran berhasil dibatalkan.'];
+    }
+
+    /**
+     * Panggilan mentah ke Xendit untuk meng-expire invoice secara manual.
+     * Endpoint resmi Xendit: POST /invoices/{invoice_id}/expire!
+     * (perhatikan tanda seru di akhir path -- ini memang begitu sesuai dokumentasi Xendit,
+     * bukan typo.)
+     */
+    private function expireInvoiceAtXendit(string $invoiceId): array
+    {
+        return $this->httpRequest('POST', '/invoices/' . urlencode($invoiceId) . '/expire!', []);
     }
 
     // ================================================================
@@ -214,7 +330,10 @@ class XenditService
         }
 
         if ($status === 'EXPIRED') {
-            if ($trx['status'] !== 'expired' && $trx['status'] !== 'paid') {
+            // 'cancelled' itu status FINAL dari sisi kita -- jangan sampai ketiban 'expired'
+            // cuma karena webhook expired Xendit datang belakangan (misal wali murid sudah
+            // batalkan duluan sebelum invoice-nya benar-benar expired secara alami di Xendit).
+            if (!in_array($trx['status'], ['expired', 'paid', 'cancelled'], true)) {
                 $this->xenditTransactionModel->update($trx['id_transaction'], ['status' => 'expired']);
                 $this->logPaymentChange($trx, null, 'WEBHOOK', $trx['status'], 'expired', ['data' => $payload], 'Invoice kedaluwarsa (dari webhook).');
             }
@@ -225,6 +344,9 @@ class XenditService
             return ['success' => true, 'message' => "Status {$status} diterima, tidak ada tindakan."];
         }
 
+        // Catatan: pengecekan "invoice sudah cancelled tapi ada info PAID masuk" ditangani
+        // secara universal di dalam updatePaymentAsPaid() (berlaku juga untuk sync manual/cron,
+        // tidak cuma webhook) -- supaya logic-nya cuma ada di 1 tempat, tidak dobel di sini.
         $result = $this->updatePaymentAsPaid($trx, $this->normalisasiDataXendit($payload), 'WEBHOOK');
         return $result;
     }
@@ -265,6 +387,21 @@ class XenditService
             $db->transComplete();
             $this->logPaymentChange($trxTerkini, null, $source, 'paid', 'paid', ['data' => $dataXendit], 'Dilewati -- transaksi sudah lunas sebelumnya (idempotent guard).');
             return ['success' => true, 'message' => 'Transaksi sudah pernah diproses sebelumnya, dilewati.'];
+        }
+
+        if ($trxTerkini['status'] === 'cancelled') {
+            // GUARD PENTING: invoice ini sudah DIBATALKAN, tapi ternyata ada informasi "sudah
+            // dibayar" yang masuk (lewat webhook ATAU sync manual/cron -- guard ini sengaja
+            // ditaruh di sini, bukan cuma di webhook, supaya berlaku untuk SEMUA jalur).
+            // JANGAN diotomatiskan jadi lunas -- tandai needs_review untuk ditinjau admin.
+            $db->table('xendit_transaction')->where('id_transaction', $trxTerkini['id_transaction'])->update(['status' => 'needs_review']);
+            $db->transComplete();
+            $this->logPaymentChange(
+                $trxTerkini, null, $source, 'cancelled', 'needs_review', ['data' => $dataXendit],
+                'PENTING: Info "sudah dibayar" diterima (via ' . $source . ') untuk invoice yang SUDAH DIBATALKAN. Kemungkinan race condition antara pembatalan dan pembayaran. TIDAK diotomatiskan jadi lunas -- perlu ditinjau admin secara manual.'
+            );
+            log_message('warning', "updatePaymentAsPaid: info PAID diterima untuk invoice yang sudah cancelled (external_id={$trxTerkini['external_id']}, source={$source}). Ditandai needs_review.");
+            return ['success' => true, 'message' => 'Invoice ini sudah dibatalkan sebelumnya. Pembayaran ditandai untuk ditinjau admin, tidak diproses otomatis.'];
         }
 
         $tagihanIds = json_decode($trxTerkini['tagihan_ids'], true) ?: [];

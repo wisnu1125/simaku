@@ -202,6 +202,32 @@ $waBendaharaLink = 'https://wa.me/' . $waBendahara . '?text=' . urlencode('Assal
         .va-title { font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; }
         .va-code { font-size: 20px; font-weight: 800; color: var(--primary); letter-spacing: 1px; font-family: monospace; }
 
+        /* Kartu Pembayaran Tertunda */
+        .pt-card {
+            display: flex;
+            gap: 14px;
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--warning);
+            padding: 18px;
+            margin-bottom: 20px;
+        }
+        .pt-icon {
+            width: 40px; height: 40px; border-radius: 11px;
+            background: var(--warning-light); color: var(--warning);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; flex-shrink: 0;
+        }
+        .pt-body { flex: 1; min-width: 0; }
+        .pt-title { font-size: 14.5px; font-weight: 800; color: var(--text-main); margin-bottom: 5px; }
+        .pt-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px; }
+        .pt-desc b { color: var(--text-main); }
+        .pt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .pt-actions .btn { flex: 1; min-width: 150px; padding: 11px 14px; font-size: 12.5px; }
+        .pt-error { margin-top: 12px; padding: 10px 12px; background: var(--danger-light); color: var(--danger); border-radius: 8px; font-size: 12px; }
+
         /* Stats Grid */
         .stats-container {
             display: grid;
@@ -552,7 +578,28 @@ $waBendaharaLink = 'https://wa.me/' . $waBendahara . '?text=' . urlencode('Assal
             <?php endif; ?>
         </div>
 
-        <a href="<?= base_url('print-kartu/' . $siswa['id_siswa'] . '/' . $tahun_ajaran_aktif) ?>" class="btn btn-primary" style="width:100%; padding:12px;">
+        <?php
+        // Tahun ajaran default untuk kartu: pakai yang aktif kalau siswa punya datanya,
+        // kalau tidak pakai yang paling baru dari daftar yang tersedia.
+        $idTahunKartuDefault = $tahun_ajaran_aktif;
+        $adaTahunAktifDiDaftar = false;
+        foreach ($daftar_tahun_ajaran as $ta) {
+            if ($ta['id_tahun_ajaran'] == $tahun_ajaran_aktif) { $adaTahunAktifDiDaftar = true; break; }
+        }
+        if (!$adaTahunAktifDiDaftar && !empty($daftar_tahun_ajaran)) {
+            $idTahunKartuDefault = $daftar_tahun_ajaran[0]['id_tahun_ajaran'];
+        }
+        $urlKartuBase = base_url('print-kartu/' . $siswa['id_siswa'] . '/');
+        ?>
+        <?php if (count($daftar_tahun_ajaran) > 1): ?>
+            <label style="font-size:11px; color:var(--text-muted); font-weight:600; margin-bottom:5px; display:block;">Pilih tahun ajaran kartu yang mau dicetak:</label>
+            <select id="pilihTahunKartu" style="width:100%; margin-bottom:8px; text-align:left; border:2px solid var(--border); background:#fff; cursor:pointer; padding:12px 14px; border-radius:12px; font-size:13px; font-weight:600; color:var(--text-main); font-family:inherit;" onchange="document.getElementById('btnDownloadKartu').href = '<?= esc($urlKartuBase) ?>' + this.value;">
+                <?php foreach ($daftar_tahun_ajaran as $ta): ?>
+                    <option value="<?= $ta['id_tahun_ajaran'] ?>" <?= $ta['id_tahun_ajaran'] == $idTahunKartuDefault ? 'selected' : '' ?>><?= esc($ta['nama_tahun_ajaran']) ?><?= $ta['id_tahun_ajaran'] == $tahun_ajaran_aktif ? ' (Aktif)' : '' ?></option>
+                <?php endforeach; ?>
+            </select>
+        <?php endif; ?>
+        <a href="<?= esc($urlKartuBase . $idTahunKartuDefault) ?>" id="btnDownloadKartu" class="btn btn-primary" style="width:100%; padding:12px;">
             <i class="fa-solid fa-download"></i> Download Kartu
         </a>
 
@@ -563,6 +610,23 @@ $waBendaharaLink = 'https://wa.me/' . $waBendahara . '?text=' . urlencode('Assal
             <a href="#cara-bayar" class="btn btn-primary">
                 <i class="fa-solid fa-circle-question"></i> Cara Bayar?
             </a>
+        </div>
+    </div>
+
+    <div class="pt-card" id="pembayaranTertundaCard" style="display:none;">
+        <div class="pt-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+        <div class="pt-body">
+            <div class="pt-title">Pembayaran Tertunda</div>
+            <div class="pt-desc">Anda punya pembayaran <b id="ptJumlah">Rp 0</b> yang belum selesai, dibuat pada <span id="ptWaktu">-</span>. Selesaikan atau batalkan dulu sebelum membuat pembayaran baru.</div>
+            <div class="pt-actions">
+                <a href="#" id="ptLanjutkan" target="_blank" class="btn btn-primary">
+                    <i class="fa-solid fa-arrow-right"></i> Lanjutkan Pembayaran
+                </a>
+                <button type="button" class="btn btn-back" id="ptBtnBatal" onclick="konfirmasiBatalkanPembayaran()">
+                    <i class="fa-solid fa-xmark"></i> Batalkan
+                </button>
+            </div>
+            <div id="ptBatalError" class="pt-error" style="display:none;"></div>
         </div>
     </div>
 
@@ -859,9 +923,9 @@ $waBendaharaLink = 'https://wa.me/' . $waBendahara . '?text=' . urlencode('Assal
                                                     (Potongan/Beasiswa Rp. -<?= number_format($t['nominal_potongan'], 0, ',', '.') ?>)
                                                 </div>
                                             <?php endif; ?>
-                                            <span class="bill-price text-red">Rp <?= number_format($t['nominal_akhir'], 0, ',', '.') ?></span>
+                                            <span class="bill-price text-red">Rp <?= number_format($t['sisa_tagihan'], 0, ',', '.') ?></span>
                                             <?php if ($t['nominal_dibayar'] > 0): ?>
-                                                <span class="bill-remaining">Sisa: Rp <?= number_format($t['sisa_tagihan'], 0, ',', '.') ?></span>
+                                                <span class="bill-remaining">dari total pembayaran: Rp <?= number_format($t['nominal_akhir'], 0, ',', '.') ?></span>
                                             <?php endif; ?>
                                         </div>
                                     </div>
@@ -1049,6 +1113,70 @@ $waBendaharaLink = 'https://wa.me/' . $waBendahara . '?text=' . urlencode('Assal
 </div>
 
 <script>
+    let idTransaksiPendingSaatIni = null;
+
+    function cekPembayaranTertunda() {
+        fetch('<?= base_url('xendit/cek-pending') ?>?id_siswa=<?= (int) $siswa['id_siswa'] ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.ada) return;
+
+                idTransaksiPendingSaatIni = data.id_transaction;
+                document.getElementById('ptJumlah').textContent = 'Rp ' + Math.round(data.total_amount).toLocaleString('id-ID');
+
+                const dibuat = new Date(data.created_at.replace(' ', 'T'));
+                document.getElementById('ptWaktu').textContent = dibuat.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) + ' pukul ' + dibuat.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                document.getElementById('ptLanjutkan').href = data.invoice_url;
+
+                document.getElementById('pembayaranTertundaCard').style.display = 'block';
+
+                // Sembunyikan tombol "Bayar Online / Hitung Tagihan" supaya wali murid tidak
+                // bisa memulai pembayaran baru selagi masih ada yang tertunda -- fokuskan dulu
+                // ke menyelesaikan/membatalkan yang ini.
+                document.querySelectorAll('.btn-calc-full').forEach(btn => btn.style.display = 'none');
+            })
+            .catch(() => { /* diam saja kalau gagal cek -- jangan sampai halaman jadi error cuma gara-gara ini */ });
+    }
+
+    function konfirmasiBatalkanPembayaran() {
+        if (!idTransaksiPendingSaatIni) return;
+
+        const yakin = confirm('Apakah Anda yakin ingin membatalkan pembayaran ini? Invoice akan dibatalkan dan jika ingin membayar kembali, sistem akan membuat invoice baru.');
+        if (!yakin) return;
+
+        const btn = document.getElementById('ptBtnBatal');
+        const errBox = document.getElementById('ptBatalError');
+        errBox.style.display = 'none';
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Membatalkan…';
+
+        const formData = new FormData();
+        formData.append('id_transaction', idTransaksiPendingSaatIni);
+
+        fetch('<?= base_url('xendit/batalkan') ?>', { method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload paling sederhana & aman supaya seluruh state halaman fresh
+                    // (tombol Bayar Online muncul lagi, kartu tertunda hilang, dst).
+                    location.reload();
+                } else {
+                    errBox.textContent = data.message || 'Gagal membatalkan pembayaran.';
+                    errBox.style.display = 'block';
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-xmark"></i> Batalkan';
+                }
+            })
+            .catch(() => {
+                errBox.textContent = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
+                errBox.style.display = 'block';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-xmark"></i> Batalkan';
+            });
+    }
+
+    cekPembayaranTertunda();
+
     function prosesBayarOnline() {
         const checked = document.querySelectorAll('.modal-checkbox:checked');
         if (checked.length === 0) return;

@@ -38,6 +38,7 @@ class RekonsiliasiController extends BaseController
             'paid_hari_ini' => $this->xenditTransactionModel->where('status', 'paid')->where('DATE(paid_at)', date('Y-m-d'))->countAllResults(),
             'expired' => $this->xenditTransactionModel->where('status', 'expired')->countAllResults(),
             'failed' => $this->xenditTransactionModel->where('status', 'failed')->countAllResults(),
+            'needs_review' => $this->xenditTransactionModel->where('status', 'needs_review')->countAllResults(),
         ];
 
         $data = [
@@ -123,5 +124,64 @@ class RekonsiliasiController extends BaseController
                       ->orderBy('created_at', 'DESC')
                       ->findAll();
         return $this->response->setJSON(['logs' => $logs]);
+    }
+
+    /**
+     * Selesaikan transaksi berstatus 'needs_review' -- terjadi kalau webhook PAID masuk
+     * untuk invoice yang sudah dibatalkan (race condition pembatalan vs pembayaran).
+     * Admin memutuskan: terima sebagai pembayaran sah, atau tolak (batalkan permanen).
+     */
+    public function resolve($idTransaction)
+    {
+        $aksi = $this->request->getPost('aksi'); // 'terima' atau 'tolak'
+        $catatan = trim((string) $this->request->getPost('catatan'));
+
+        $trx = $this->xenditTransactionModel->find($idTransaction);
+        if (!$trx) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Transaksi tidak ditemukan.']);
+        }
+        if ($trx['status'] !== 'needs_review') {
+            return $this->response->setJSON(['success' => false, 'message' => 'Transaksi ini tidak (lagi) berstatus perlu ditinjau.']);
+        }
+
+        $namaAdmin = session()->get('nama_lengkap') ?? session()->get('username') ?? 'Admin';
+
+        if ($aksi === 'terima') {
+            // Admin memastikan uangnya memang benar-benar masuk -- proses seperti pembayaran
+            // biasa (catat pembayaran, lunas-kan tagihan) lewat method yang SAMA dipakai
+            // webhook/sync, supaya tidak ada logic pelunasan yang terduplikasi.
+            $dataXendit = [
+                'payment_channel' => $trx['payment_channel'] ?? 'XENDIT',
+                'payment_id' => $trx['xendit_payment_id'] ?? null,
+                'paid_at' => date('Y-m-d H:i:s'),
+            ];
+            $result = $this->xenditService->updatePaymentAsPaid($trx, $dataXendit, 'MANUAL');
+            if ($result['success']) {
+                $this->paymentLogModel->insert([
+                    'id_transaction' => $idTransaction, 'invoice_id' => $trx['xendit_invoice_id'], 'external_id' => $trx['external_id'],
+                    'source' => 'MANUAL', 'old_status' => 'needs_review', 'new_status' => 'paid',
+                    'message' => 'Ditinjau & diterima sebagai pembayaran sah oleh ' . $namaAdmin . ($catatan ? ' -- catatan: ' . $catatan : ''),
+                ]);
+            }
+            return $this->response->setJSON($result);
+        }
+
+        if ($aksi === 'tolak') {
+            $db = \Config\Database::connect();
+            $db->table('xendit_transaction')
+               ->where('id_transaction', $idTransaction)
+               ->where('status', 'needs_review')
+               ->update(['status' => 'cancelled', 'cancelled_at' => date('Y-m-d H:i:s'), 'cancelled_by' => $namaAdmin]);
+
+            $this->paymentLogModel->insert([
+                'id_transaction' => $idTransaction, 'invoice_id' => $trx['xendit_invoice_id'], 'external_id' => $trx['external_id'],
+                'source' => 'MANUAL', 'old_status' => 'needs_review', 'new_status' => 'cancelled',
+                'message' => 'Ditinjau & DITOLAK (dibatalkan permanen) oleh ' . $namaAdmin . ($catatan ? ' -- catatan: ' . $catatan : ''),
+            ]);
+
+            return $this->response->setJSON(['success' => true, 'message' => 'Transaksi ditolak dan dibatalkan permanen.']);
+        }
+
+        return $this->response->setJSON(['success' => false, 'message' => 'Aksi tidak valid.']);
     }
 }

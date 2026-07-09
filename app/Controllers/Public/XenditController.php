@@ -36,6 +36,49 @@ class XenditController extends BaseController
     }
 
     /**
+     * Dipanggil via AJAX saat halaman Detail Tagihan dimuat -- cek apakah siswa ini
+     * punya invoice PENDING yang masih aktif, supaya bisa ditampilkan kartu "Pembayaran
+     * Tertunda" (Lanjutkan/Batalkan) alih-alih langsung menawarkan "Bayar Online" biasa.
+     * Wali murid tidak perlu tahu istilah invoice/pending sama sekali -- ini murni buat
+     * menentukan tampilan mana yang muncul.
+     */
+    public function cekPending()
+    {
+        $idSiswa = (int) $this->request->getGet('id_siswa');
+        if (!$idSiswa) {
+            return $this->response->setJSON(['ada' => false]);
+        }
+
+        $trx = $this->xenditService->findActivePendingInvoice($idSiswa);
+        if (!$trx) {
+            return $this->response->setJSON(['ada' => false]);
+        }
+
+        return $this->response->setJSON([
+            'ada' => true,
+            'id_transaction' => $trx['id_transaction'],
+            'invoice_url' => $trx['invoice_url'],
+            'total_amount' => $trx['total_amount'],
+            'created_at' => $trx['created_at'],
+        ]);
+    }
+
+    /**
+     * Dipanggil via AJAX saat wali murid menekan "Batalkan Pembayaran" (setelah
+     * mengonfirmasi lewat dialog konfirmasi di sisi frontend).
+     */
+    public function batalkan()
+    {
+        $idTransaction = (int) $this->request->getPost('id_transaction');
+        if (!$idTransaction) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Transaksi tidak valid.']);
+        }
+
+        $result = $this->xenditService->cancelInvoice($idTransaction, 'wali_murid');
+        return $this->response->setJSON($result);
+    }
+
+    /**
      * Halaman setelah wali murid selesai (atau membatalkan) proses pembayaran di
      * halaman Xendit -- ini yang jadi success_redirect_url saat invoice dibuat.
      * Catatan: status PASTI di sini bisa saja belum "paid" kalau webhook dari Xendit

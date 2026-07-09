@@ -17,6 +17,8 @@ $routes->get('print-kartu/(:num)/(:num)', 'Public\HomeController::printKartu/$1/
 
 // Pembayaran online (Xendit)
 $routes->post('xendit/bayar', 'Public\XenditController::bayar');
+$routes->get('xendit/cek-pending', 'Public\XenditController::cekPending');
+$routes->post('xendit/batalkan', 'Public\XenditController::batalkan');
 $routes->get('cek-tagihan/pembayaran-selesai/(:segment)', 'Public\XenditController::selesai/$1');
 $routes->post('xendit/webhook', 'Public\XenditController::webhook');
 
@@ -121,6 +123,7 @@ $routes->group('admin', ['filter' => 'auth'], function($routes) {
     $routes->post('rekonsiliasi/sync-batch', 'Admin\RekonsiliasiController::syncBatch');
     $routes->get('rekonsiliasi/pending-ids', 'Admin\RekonsiliasiController::pendingIds');
     $routes->get('rekonsiliasi/logs/(:num)', 'Admin\RekonsiliasiController::logs/$1');
+    $routes->post('rekonsiliasi/resolve/(:num)', 'Admin\RekonsiliasiController::resolve/$1');
     
     // Kenaikan Kelas
     $routes->get('kenaikan-kelas', 'Admin\KenaikanKelasController::index');

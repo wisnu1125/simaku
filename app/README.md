@@ -1,186 +1,95 @@
-# Payment Sync, Rekonsiliasi & Audit Log — SIMAKU
-
-Fitur lanjutan integrasi Xendit: sinkronisasi status manual/otomatis, audit log,
-webhook log, dan halaman rekonsiliasi pembayaran.
+# Fitur Batalkan Pembayaran — SIMAKU
 
 ## 1. Cara Pasang
+1. **Backup database dulu.**
+2. Jalankan `004_batalkan_pembayaran.sql` — pastikan migrasi `001`, `002`, `003` sudah pernah dijalankan lebih dulu.
+3. Timpa file PHP sesuai struktur folder di paket ini.
+4. Tidak ada perubahan `.env` tambahan.
 
-1. **Backup database dulu** (fitur ini mengubah struktur tabel).
-2. Jalankan `002_migrasi_payment_sync.sql` — **pastikan migrasi Xendit dasar
-   (`001_migrasi_xendit.sql`) sudah pernah dijalankan lebih dulu**, karena
-   file ini menambah kolom ke tabel `xendit_transaction` yang dibuat di situ.
-3. Timpa semua file PHP sesuai struktur folder di paket ini.
-4. Tidak ada perubahan `.env` tambahan — masih pakai `xendit.secretKey` dan
-   `xendit.webhookToken` yang sudah Anda isi sebelumnya.
-
-## 2. Struktur File Baru/Diubah
-
+## 2. Struktur File
 ```
-002_migrasi_payment_sync.sql          [BARU] Migrasi database
-Config/
-  Xendit.php                          (tidak berubah, ikut disertakan buat referensi)
-  Routes.php                          [DIUBAH] +5 route Rekonsiliasi
-Models/
-  XenditTransactionModel.php          [DIUBAH] +2 kolom baru
-  PaymentLogModel.php                 [BARU]
-  PaymentWebhookLogModel.php          [BARU]
-Services/
-  XenditService.php                   [DITULIS ULANG] +sync, +logging, +unified update
-Controllers/
-  Public/XenditController.php         [DIUBAH] webhook jadi lebih tipis + logging
-  Admin/RekonsiliasiController.php    [BARU]
-  Admin/DashboardController.php       [DIUBAH] +data Payment Monitoring
-Commands/
-  PaymentSyncCommand.php              [BARU] php spark payment
-Views/admin/
-  rekonsiliasi/index.php              [BARU] Halaman Rekonsiliasi Pembayaran
-  dashboard/index.php                 [DIUBAH] +widget Payment Monitoring
-  layouts/header.php                  [DIUBAH] +menu Rekonsiliasi, +toast.info
-  layouts/footer.php                  [DIUBAH] +showToast()
+004_batalkan_pembayaran.sql              [BARU] Migrasi database
+Models/XenditTransactionModel.php        [DIUBAH] +cancelled_at, +cancelled_by
+Services/XenditService.php               [DIUBAH BESAR] +cancelInvoice, +findActivePendingInvoice, dst
+Controllers/Public/XenditController.php  [DIUBAH] +cekPending(), +batalkan()
+Controllers/Admin/RekonsiliasiController.php [DIUBAH] +resolve()
+Config/Routes.php                        [DIUBAH] +4 route baru
+Views/public/detail.php                  [DIUBAH] +kartu "Pembayaran Tertunda"
+Views/admin/rekonsiliasi/index.php       [DIUBAH] +badge & panel "Perlu Ditinjau"
 ```
 
-## 3. Penjelasan Tiap Bagian
+## 3. Pemetaan ke Permintaan Anda
 
-### Payment Status Sync (poin 1)
-Semuanya ada di `XenditService.php`:
-- `getInvoiceStatus($invoiceId)` — `GET /v2/invoices/{id}` langsung ke Xendit
-- `getInvoiceByExternalId($externalId)` — cari invoice pakai external_id kalau invoice_id belum diketahui
-- `syncInvoice($idTransaction, $source)` — orkestrasi: tanya status ke Xendit, bandingkan dengan database, panggil `updatePaymentAsPaid()` kalau ternyata sudah PAID
+**1. Fitur Batalkan Pembayaran** — Di halaman Cek Tagihan, kalau wali murid punya invoice
+PENDING yang masih aktif, otomatis muncul kartu "Pembayaran Tertunda" dengan tombol
+**Lanjutkan Pembayaran** dan **Batalkan Pembayaran**. Dialog konfirmasinya persis teks
+yang Anda minta. Setelah dikonfirmasi: sistem coba `POST /invoices/{id}/expire!` ke
+Xendit dulu (endpoint resmi mereka untuk ini) — **berhasil atau gagal, keduanya tetap
+lanjut membatalkan di SIMAKU**, cuma hasil dari Xendit-nya dicatat ke log.
 
-**Method tunggal `updatePaymentAsPaid()`** — ini jantung dari seluruh sistem.
-Baik webhook, sync manual (tombol), maupun cron (`php spark payment`) **semua
-memanggil method yang sama persis ini**. Tidak ada logic pelunasan yang
-diduplikasi di 3 tempat berbeda — kalau nanti perlu ubah cara pencatatan
-pembayaran, cukup ubah 1 method ini saja.
+**2. Data tidak dihapus** — Status berubah jadi `cancelled`, kolom `cancelled_at` dan
+`cancelled_by` (isinya `wali_murid` kalau dari halaman publik, atau nama admin kalau
+dari panel Rekonsiliasi) terisi otomatis.
 
-### Tombol Sinkronkan & Sinkronkan Semua (poin 2 & 3)
-Halaman baru: **admin/rekonsiliasi**. Setiap transaksi pending ada tombol
-sinkronkan sendiri-sendiri. Tombol "Sinkronkan Semua Pending" akan:
-1. Ambil daftar ID transaksi pending
-2. Proses **satu-per-satu** (bukan 1 request besar) — supaya progress bar
-   bisa jalan bertahap dan tidak berisiko timeout kalau pending-nya banyak
-3. Setelah selesai, tampilkan ringkasan: berapa berhasil, berapa berubah
-   statusnya, berapa gagal
+**3. Dashboard** — Setelah dibatalkan, halaman reload otomatis: kartu "Pembayaran
+Tertunda" hilang, tombol "Bayar Online" yang sempat disembunyikan (supaya tidak dobel
+selagi masih ada yang pending) muncul kembali.
 
-### Auto Retry — `php spark payment` (poin 4)
-Ada di `Commands/PaymentSyncCommand.php`. Fitur keamanannya:
-- **Cuma proses transaksi yang dibuat LEBIH dari 2 menit lalu** (bisa diatur
-  lewat `--older-than`) — supaya tidak "berebut" dengan webhook yang mungkin
-  baru saja dikirim Xendit untuk transaksi yang sama
-- Kalau 1 transaksi error saat diproses, **tidak menghentikan seluruh proses**
-  — lanjut ke transaksi berikutnya, dicatat sebagai gagal
-- Aman dijalankan berkali-kali (idempotent, lihat poin 8)
+**4. Bayar lagi** — `createInvoiceForSiswa()` (dipanggil tombol Bayar Online) sekarang
+SELALU cek dulu apakah ada invoice pending yang masih aktif untuk siswa ini. Ada →
+diarahkan ke invoice lama. Tidak ada (karena cancelled/expired) → invoice baru dibuat.
+Invoice yang sudah cancelled/expired tidak pernah dipakai ulang.
 
-**Contoh isi crontab** (jalan tiap 10 menit):
-```
-*/10 * * * * cd /path/ke/project && php spark payment >> writable/logs/payment-cron.log 2>&1
-```
-Ganti `/path/ke/project` dengan lokasi folder project di server Anda. Kalau
-pakai cPanel/hPanel, biasanya ada menu "Cron Jobs" — tinggal isi command yang
-sama di sana.
+**5 & 6. Webhook + Manual Review** — Ini bagian paling kritis, saya taruh sebagai
+**guard universal di dalam `updatePaymentAsPaid()`** (method tunggal yang dipakai
+webhook, sync manual, DAN cron) -- bukan cuma di jalur webhook saja. Jadi:
+- Kalau info "PAID" datang dari MANAPUN untuk invoice yang sudah `cancelled` → status
+  otomatis jadi `needs_review`, TIDAK pernah otomatis dianggap lunas.
+- Persis skenario 09:00/09:05/09:06 yang Anda contohkan: teruji lewat kode, saat proses
+  pelunasan menemukan status `cancelled` di database (dibaca ulang tepat sebelum
+  diproses, bukan data lama), langsung dialihkan ke `needs_review`.
 
-### Webhook Improvement (poin 5)
-**Soal "signature"**: Xendit (beda dari Stripe/GitHub) tidak pakai HMAC
-signature — mekanisme resminya adalah **token pembanding** lewat header
-`X-Callback-Token`. Ini yang sudah dipakai sejak integrasi awal, dan itu
-memang cara yang BENAR sesuai dokumentasi Xendit — bukan disederhanakan.
+**7. Logging** — Semua poin yang Anda sebutkan tercatat ke tabel `payment_logs` yang
+sudah ada (dari fitur sebelumnya): invoice dibuat, invoice dibatalkan, request+respons
+ke Xendit, invoice expired, invoice paid, webhook diterima, dan kasus PAID-setelah-
+cancelled. Webhook mentah (termasuk yang gagal validasi token) tetap tercatat di
+`payment_webhook_logs` seperti sebelumnya.
 
-Yang ditambahkan sekarang:
-- **Semua request webhook dicatat** ke `payment_webhook_logs` — valid maupun
-  ditolak, buat keperluan debugging
-- **Database transaction** dengan rollback otomatis kalau ada bagian yang gagal
-- Response ke Xendit sesuai ekspektasi mereka (HTTP 200 untuk sukses/sudah
-  diproses, supaya Xendit tidak terus mengirim ulang notifikasi yang sama)
-- **Controller dibuat tipis** — cuma validasi token, panggil Service, catat
-  log, return response. Tidak ada logic pelunasan tagihan di Controller sama
-  sekali, semua di `XenditService::processWebhookPayload()` →
-  `updatePaymentAsPaid()`
+**8. UX** — Dashboard/halaman Cek Tagihan HANYA menganggap invoice "aktif" kalau
+statusnya `pending` DAN belum lewat `invoice_duration` sejak dibuat (`findActivePendingInvoice()`).
+Cancelled/expired tidak pernah muncul sebagai "Pembayaran Tertunda". Wali murid cuma
+lihat 2 tombol sederhana (Lanjutkan/Batalkan) atau tombol Bayar biasa -- tidak pernah
+diperlihatkan istilah invoice/pending/cancelled sama sekali.
 
-### Audit Log — `payment_logs` (poin 6)
-Setiap kali ada percobaan perubahan status (berhasil maupun tidak), tercatat
-dengan: sumbernya (WEBHOOK/MANUAL/CRON), status lama → status baru, snapshot
-data dari Xendit, dan pesan penjelasan. Bisa dilihat lewat tombol "Lihat Log"
-di halaman Rekonsiliasi.
+## 4. Sisi Admin — Halaman Rekonsiliasi
+Ada kartu statistik baru **"Perlu Ditinjau"** (ungu, warna beda dari status lain biar
+mencolok) + filter status `needs_review`. Setiap transaksi begini punya tombol palu
+(<i class="fa-solid fa-gavel"></i>) yang buka panel keputusan:
+- **Terima sebagai Lunas** — proses seperti pembayaran biasa (lewat `updatePaymentAsPaid()`
+  yang sama, jadi tidak ada logic ganda)
+- **Tolak (Batalkan Permanen)** — status jadi `cancelled` lagi, perlu tindak lanjut manual
+  (refund dll) di luar sistem
 
-### Webhook Log — `payment_webhook_logs` (poin 7)
-Mencatat **request mentahnya** (bukan hasil prosesnya) — header, token yang
-diterima, payload, hasil validasi (VALID/INVALID_TOKEN/INVALID_PAYLOAD/ERROR).
-Kalau suatu saat ada laporan "kok pembayaran X tidak otomatis lunas", tabel
-ini yang pertama dicek — apakah webhook-nya memang sampai atau tidak.
+Ada kolom catatan opsional yang ikut tersimpan ke `payment_logs`.
 
-### Idempotency (poin 8)
-Dijamin oleh 2 lapis di `updatePaymentAsPaid()`:
-1. **Baca ulang status TERKINI** dari database tepat sebelum memproses (bukan
-   pakai data yang sudah di-fetch sebelumnya) — kalau ternyata statusnya
-   SUDAH `paid` (diproses proses lain barusan), langsung berhenti, tidak
-   diproses ulang
-2. **Guard di level query UPDATE**: `WHERE status != 'paid'` — jaga-jaga
-   ekstra kalau ada 2 proses jalan hampir bersamaan persis di detik yang sama
+## 5. Keamanan Idempotency (poin krusial lain di luar daftar Anda, tapi penting)
+Ditambahkan 2 lapis guard supaya tidak ada race condition:
+- `updatePaymentAsPaid()` membaca ULANG status transaksi LANGSUNG dari database tepat
+  sebelum diproses (bukan data yang sudah di-fetch sebelumnya) -- baik status `paid`
+  MAUPUN `cancelled` sama-sama jadi guard di titik ini.
+- Query UPDATE pembatalan & pelunasan sama-sama pakai klausa `WHERE status = '...'`
+  sebagai pengaman tambahan di level database.
 
-Hasilnya: dipanggil 1x atau 100x dengan data yang sama, hasilnya identik —
-tidak ada pembayaran dobel, tidak ada saldo tagihan dikurangi 2x.
+## 6. Sudah Diuji
+- Migrasi database dijalankan & diverifikasi
+- Semua file PHP tervalidasi sintaksnya
+- Simulasi browser: kartu "Pembayaran Tertunda" muncul/tersembunyi dengan benar,
+  tombol Bayar Online ikut disembunyikan saat ada yang pending, alur konfirmasi+batalkan
+  jalan lewat fetch yang benar, panel "Selesaikan Peninjauan" di admin (buka panel →
+  isi keputusan → submit → panel tertutup) semua teruji tanpa error
+- 32 kondisi halaman (termasuk fitur-fitur sebelumnya) tetap lolos render
 
-### Database Transaction (poin 9)
-Seluruh isi `updatePaymentAsPaid()` (insert pembayaran + update tagihan +
-update status transaksi + insert audit log) dibungkus `$db->transStart()` /
-`$db->transComplete()`. Kalau salah satu langkah gagal, SEMUANYA di-rollback
-— tidak akan ada kondisi "tagihan sudah lunas tapi catatan pembayarannya
-hilang" atau sebaliknya.
-
-### Error Handling (poin 10)
-Di `XenditService::httpRequest()`, semua kondisi berikut ditangani dengan
-pesan yang jelas (bukan cuma "Error"):
-timeout, gagal koneksi, invoice tidak ditemukan (404), rate limit (429),
-error di server Xendit (5xx). Semua tercatat ke `log_message()` bawaan CI4
-juga, bisa dicek di `writable/logs/`.
-
-### Dashboard Monitoring (poin 11)
-Widget baru di Dashboard: Pending, Lunas Hari Ini, Webhook Gagal (24 jam
-terakhir), Perlu Sync (pending yang belum pernah disinkronkan sama sekali),
-dan waktu sinkronisasi terakhir.
-
-### UI — Badge & Tombol (poin 12)
-Badge: Pending (kuning), Lunas (hijau), Kedaluwarsa (abu), Gagal (merah),
-plus badge tambahan oranye "Perlu Sync" untuk pending yang belum pernah
-dicek. Tombol Sinkronkan/Sinkronkan Semua/Lihat Log semua pakai komponen
-desain yang SAMA dengan yang sudah dipakai di seluruh aplikasi Anda (bukan
-Bootstrap terpisah — karena aplikasi ini sejak awal memang tidak memakai
-Bootstrap, tapi sistem desain custom sendiri yang sudah konsisten di semua
-halaman; saya ikuti itu supaya tidak ada 2 gaya berbeda di 1 aplikasi).
-
-### Keamanan (poin 13)
-- Semua route Rekonsiliasi ada di dalam grup `admin` yang sudah otomatis
-  butuh login (filter `auth`) — sama seperti halaman admin lainnya
-- Webhook TIDAK butuh login (memang tidak bisa, karena yang mengakses adalah
-  server Xendit) — tapi WAJIB token cocok, ditolak (401) kalau tidak
-- Secret API Key **tidak pernah** ada di kode manapun — cuma dibaca dari
-  `.env` lewat `Config/Xendit.php`
-
-### Kualitas Kode (poin 14)
-- **Service Layer**: seluruh logic bisnis di `XenditService`, Controller
-  cuma jembatan tipis (terima request → panggil Service → kembalikan respons)
-- **DRY**: 1 method (`updatePaymentAsPaid`) dipakai 3 sumber berbeda
-- Tidak ada query database langsung di Controller — semua lewat Model/Service
-- Repository pattern TIDAK ditambahkan karena project ini memang sejak awal
-  memakai pola Model bawaan CodeIgniter, bukan Repository terpisah — supaya
-  konsisten dengan seluruh kode yang sudah ada, bukan malah bikin 2 gaya
-  arsitektur berbeda dalam 1 aplikasi
-
-## 4. Yang TIDAK Diubah (Kompatibilitas)
-Fitur pembayaran online yang sudah jalan (buat invoice, redirect ke Xendit,
-webhook dasar) **tidak ada yang dihapus** — cuma diperkuat. Alur wali murid
-bayar dari halaman "Cek Tagihan" sama sekali tidak berubah.
-
-## 5. Sudah Diuji
-- Migrasi database dijalankan & diverifikasi ke database uji
-- Seluruh file PHP tervalidasi sintaksnya
-- Seluruh interaksi JS di halaman Rekonsiliasi disimulasikan (muat daftar,
-  sync 1, sync semua dengan progress, lihat log, notifikasi toast) — semua
-  lolos tanpa error
-- 32 kondisi halaman (termasuk yang sudah ada sebelumnya) tetap lolos render
-
-**Yang BELUM bisa saya uji** (karena tidak ada akses API key sungguhan):
-panggilan nyata ke `GET /v2/invoices/{id}` di Xendit. Endpoint dan format
-respons sudah saya verifikasi ke dokumentasi resmi Xendit, tapi tetap
-sarankan uji di mode Test dulu (`xnd_development_...`) sebelum dipakai
-dengan uang sungguhan.
+**Belum bisa diuji** (tidak ada API key sungguhan): panggilan nyata ke endpoint
+`/invoices/{id}/expire!`. Formatnya sudah saya verifikasi ke dokumentasi resmi Xendit
+(SDK Node.js, PHP, Go semua menunjukkan pola yang sama), tapi sarankan dites dulu di
+mode Test sebelum dipakai dengan uang sungguhan.

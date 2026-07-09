@@ -113,19 +113,35 @@ class HomeController extends BaseController
                             ->orderBy('pembayaran.tanggal_bayar', 'DESC')
                             ->findAll();
         
-        // Get tahun ajaran aktif untuk link print
+        // Get tahun ajaran aktif untuk default pilihan cetak kartu
         $db = \Config\Database::connect();
         $tahunAjaranAktif = $db->table('tahun_ajaran')
                                ->where('status', 'aktif')
                                ->get()
                                ->getRowArray();
         
+        // Daftar SEMUA tahun ajaran yang siswa ini punya datanya (bukan cuma yang aktif) --
+        // dipakai untuk pilihan "Download Kartu" per tahun ajaran. Diambil dari baris
+        // pertama tiap grup di $tagihanByTahun (setiap baris tagihan sudah bawa id_tahun_ajaran).
+        $daftarTahunAjaran = [];
+        foreach ($tagihanByTahun as $namaTahun => $rows) {
+            if (!empty($rows[0]['id_tahun_ajaran'])) {
+                $daftarTahunAjaran[] = [
+                    'id_tahun_ajaran' => $rows[0]['id_tahun_ajaran'],
+                    'nama_tahun_ajaran' => $namaTahun,
+                ];
+            }
+        }
+        // Urutkan terbaru dulu (id lebih besar = tahun ajaran lebih baru, mengikuti urutan dibuatnya data)
+        usort($daftarTahunAjaran, fn ($a, $b) => $b['id_tahun_ajaran'] <=> $a['id_tahun_ajaran']);
+        
         $data = [
             'title' => 'Detail Tagihan - ' . $siswaDetail['nama_lengkap'],
             'siswa' => $siswaDetail,
             'tagihan_by_tahun' => $tagihanByTahun, // Data dikirim per tahun
             'pembayaran' => $pembayaran,
-            'tahun_ajaran_aktif' => $tahunAjaranAktif['id_tahun_ajaran'] ?? null
+            'tahun_ajaran_aktif' => $tahunAjaranAktif['id_tahun_ajaran'] ?? null,
+            'daftar_tahun_ajaran' => $daftarTahunAjaran,
         ];
         
         return view('public/detail', $data);

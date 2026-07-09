@@ -17,7 +17,7 @@
 .toolbar select { width: 100%; }
 @media (min-width: 768px) { .toolbar select { width: 170px; flex-shrink: 0; } }
 
-.va-code { font-family: 'Roboto Mono', monospace; background: var(--border-soft); padding: 3px 8px; border-radius: 6px; color: var(--brand-darker); font-size: 12px; }
+
 
 /* --- Mobile card list --- */
 .siswa-card { padding: 14px; display: flex; align-items: center; gap: 12px; }
@@ -30,7 +30,7 @@
 .pager { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--border-soft); font-size: 12.5px; color: var(--muted); }
 .pager .btns { display: flex; gap: 6px; }
 
-.va-hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
 
 .detail-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
 @media (min-width: 700px) { .detail-grid { grid-template-columns: 1fr 1fr; align-items: start; } }
@@ -127,15 +127,6 @@
                         <option value="lulus">Lulus</option>
                     </select>
                 </div>
-            </div>
-
-            <div class="field">
-                <label>Virtual Account</label>
-                <div style="display:flex; gap:8px;">
-                    <input class="input" name="virtual_account" id="f_va" placeholder="Klik Generate atau isi manual" value="<?= esc(old('virtual_account', '')) ?>">
-                    <button type="button" class="btn btn-secondary" id="f_va_btn" onclick="generateVA()"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
-                </div>
-                <div class="va-hint">Boleh sama dengan siswa lain. Kosongkan saat tambah baru untuk generate otomatis.</div>
             </div>
 
         </div>
@@ -257,7 +248,6 @@
                     <th>Nama Lengkap</th>
                     <th>Tanggal Lahir</th>
                     <th>Kelas</th>
-                    <th>Virtual Account</th>
                     <th>Status</th>
                     <th style="text-align:right;">Aksi</th>
                 </tr>
@@ -311,7 +301,7 @@ function showSkeleton() {
     let html = '';
     for (let i = 0; i < 4; i++) html += '<div class="skeleton-row"><div class="skeleton-bar" style="width:60%;"></div><div class="skeleton-bar" style="width:35%;"></div></div>';
     document.getElementById('cardList').innerHTML = html;
-    document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" style="padding:0;">' + html + '</td></tr>';
+    document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" style="padding:0;">' + html + '</td></tr>';
 }
 
 async function loadPage() {
@@ -361,7 +351,6 @@ async function loadPage() {
                 </td>
                 <td class="mono" style="font-size:12.5px;">${fmtDate(s.tanggal_lahir)}</td>
                 <td>${s.nama_kelas ? '<span class="badge badge-neutral">' + esc(s.nama_kelas) + '</span>' : '<span style="color:var(--faint);">—</span>'}</td>
-                <td><span class="va-code">${esc(s.virtual_account)}</span></td>
                 <td>${statusBadge(s.status_siswa)}</td>
                 <td style="text-align:right;">
                     <button class="icon-action" title="Detail" onclick="openDetailDrawer(${s.id_siswa})"><i class="fa-solid fa-eye"></i></button>
@@ -426,7 +415,6 @@ function openCreateModal() {
     document.getElementById('siswaForm').action = BASE_URL + '/admin/siswa/store';
     document.getElementById('f_status_wrap').style.display = 'none';
     document.getElementById('f_status_siswa').removeAttribute('required');
-    document.getElementById('f_va_btn').style.display = 'inline-flex';
     openPanel('siswaPanel');
 }
 
@@ -445,12 +433,10 @@ function fillEditForm(s) {
     document.getElementById('f_nama_wali').value = s.nama_wali || '';
     document.getElementById('f_telp_wali').value = s.telp_wali || '';
     document.getElementById('f_id_kelas').value = s.id_kelas || '';
-    document.getElementById('f_va').value = s.virtual_account || '';
 
     document.getElementById('f_status_wrap').style.display = 'block';
     document.getElementById('f_status_siswa').setAttribute('required', 'required');
     document.getElementById('f_status_siswa').value = s.status_siswa || 'aktif';
-    document.getElementById('f_va_btn').style.display = 'none';
 
     openPanel('siswaPanel');
 }
@@ -464,12 +450,6 @@ function openEditModal(id) {
     fetch(BASE_URL + '/admin/siswa/detail/' + id, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(r => r.json())
         .then(data => { if (data.siswa) { resetForm(); fillEditForm(data.siswa); } });
-}
-
-function generateVA() {
-    const nis = document.getElementById('f_nis').value;
-    if (!nis) { alert('Isi NIS terlebih dahulu.'); document.getElementById('f_nis').focus(); return; }
-    document.getElementById('f_va').value = '88' + nis.padStart(10, '0');
 }
 
 function hapusSiswa(id, nama) {
@@ -548,7 +528,6 @@ function renderDrawer(data) {
                         <div class="info-row"><span class="k">Jenis Kelamin</span><span class="v">${s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</span></div>
                         <div class="info-row"><span class="k">Tanggal Lahir</span><span class="v">${fmtDate(s.tanggal_lahir)}</span></div>
                         <div class="info-row"><span class="k">Kelas</span><span class="v">${s.nama_kelas ? esc(s.nama_kelas) : 'Belum ada kelas'}</span></div>
-                        <div class="info-row"><span class="k">Virtual Account</span><span class="v mono">${esc(s.virtual_account)}</span></div>
                     </div>
                 </div>
                 <div>
@@ -612,11 +591,9 @@ if (HAS_IMPORT_RESULT) {
         document.getElementById('siswaForm').action = BASE_URL + '/admin/siswa/update/' + OLD_EDITING_ID;
         document.getElementById('f_status_wrap').style.display = 'block';
         document.getElementById('f_status_siswa').setAttribute('required', 'required');
-        document.getElementById('f_va_btn').style.display = 'none';
     } else {
         document.getElementById('siswaModalTitle').textContent = 'Tambah Siswa';
         document.getElementById('siswaForm').action = BASE_URL + '/admin/siswa/store';
-        document.getElementById('f_va_btn').style.display = 'inline-flex';
     }
     openPanel('siswaPanel');
 } else if (location.hash) {

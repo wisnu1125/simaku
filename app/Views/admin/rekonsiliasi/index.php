@@ -2,7 +2,8 @@
 
 <style>
 .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
-@media (min-width: 640px) { .stat-grid { grid-template-columns: repeat(4, 1fr); gap: 16px; } }
+@media (min-width: 640px) { .stat-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; } }
+@media (min-width: 1100px) { .stat-grid { grid-template-columns: repeat(5, 1fr); } }
 .stat-card { padding: 14px 16px; }
 .stat-card .value { font-size: 19px; font-weight: 900; color: var(--ink); }
 .stat-card .label { font-size: 10.5px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .3px; margin-top: 2px; }
@@ -45,6 +46,7 @@
     <div class="card stat-card"><div class="value" style="color:var(--success);"><?= number_format($ringkasan['paid_hari_ini']) ?></div><div class="label">Lunas Hari Ini</div></div>
     <div class="card stat-card"><div class="value" style="color:var(--muted);"><?= number_format($ringkasan['expired']) ?></div><div class="label">Kedaluwarsa</div></div>
     <div class="card stat-card"><div class="value" style="color:var(--danger);"><?= number_format($ringkasan['failed']) ?></div><div class="label">Gagal</div></div>
+    <div class="card stat-card" style="<?= $ringkasan['needs_review'] > 0 ? 'border:2px solid #7e22ce;' : '' ?>"><div class="value" style="color:#7e22ce;"><?= number_format($ringkasan['needs_review']) ?></div><div class="label">Perlu Ditinjau</div></div>
 </div>
 
 <div class="toolbar">
@@ -54,6 +56,7 @@
         <option value="paid">Lunas</option>
         <option value="expired">Kedaluwarsa</option>
         <option value="failed">Gagal</option>
+        <option value="needs_review">Perlu Ditinjau</option>
     </select>
     <div class="spacer"></div>
     <button class="btn btn-primary" onclick="openSyncAllPanel()"><i class="fa-solid fa-arrows-rotate"></i> Sinkronkan Semua Pending</button>
@@ -93,6 +96,43 @@
     </div>
 </div>
 
+<!-- ===================== PANEL: Selesaikan Peninjauan (needs_review) ===================== -->
+<div class="inline-panel inline-panel-narrow" id="resolvePanel">
+    <div class="inline-panel-header"><h3>Selesaikan Peninjauan</h3><button type="button" class="inline-panel-close" onclick="closePanel('resolvePanel')"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="inline-panel-body">
+        <div style="background:#f3e8ff; border:1px solid #d8b4fe; border-radius:10px; padding:12px 14px; margin-bottom:16px; font-size:12.5px; color:#6b21a8; line-height:1.6;">
+            <i class="fa-solid fa-circle-info"></i> Transaksi ini sempat <strong>dibatalkan</strong>, tapi ada informasi pembayaran yang masuk setelahnya (kemungkinan wali murid membatalkan hampir bersamaan dengan menyelesaikan pembayaran). Sistem tidak otomatis melunaskan -- perlu keputusan Anda.
+        </div>
+        <div class="info-row"><span class="k">Siswa</span><span class="v" id="resolveNama">-</span></div>
+        <div class="info-row"><span class="k">Nominal</span><span class="v" id="resolveNominal">-</span></div>
+
+        <div style="margin-top:16px;">
+            <label style="font-size:12px; font-weight:700; color:var(--ink); display:block; margin-bottom:8px;">Keputusan</label>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <label style="display:flex; align-items:center; gap:8px; padding:12px; border:2px solid var(--border); border-radius:10px; cursor:pointer;">
+                    <input type="radio" name="resolveAksi" value="terima" checked style="width:16px; height:16px; accent-color:var(--success);">
+                    <div><strong style="font-size:13px; color:var(--success);">Terima sebagai Lunas</strong><div style="font-size:11px; color:var(--muted);">Uangnya memang benar masuk -- lunaskan tagihan seperti biasa</div></div>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; padding:12px; border:2px solid var(--border); border-radius:10px; cursor:pointer;">
+                    <input type="radio" name="resolveAksi" value="tolak" style="width:16px; height:16px; accent-color:var(--danger);">
+                    <div><strong style="font-size:13px; color:var(--danger);">Tolak (Batalkan Permanen)</strong><div style="font-size:11px; color:var(--muted);">Tetap dianggap batal -- perlu tindak lanjut manual (mis. refund) di luar sistem</div></div>
+                </label>
+            </div>
+        </div>
+
+        <div style="margin-top:14px;">
+            <label style="font-size:12px; font-weight:700; color:var(--ink); display:block; margin-bottom:6px;">Catatan (opsional)</label>
+            <textarea id="resolveCatatan" class="input" rows="2" style="width:100%; resize:vertical;" placeholder="Contoh: sudah dikonfirmasi lewat WA, uang masuk rekening sekolah"></textarea>
+        </div>
+
+        <div id="resolveError" style="display:none; margin-top:12px; padding:10px 12px; background:#fef2f2; color:#dc2626; border-radius:8px; font-size:12px;"></div>
+    </div>
+    <div class="inline-panel-footer">
+        <button type="button" class="btn btn-secondary" onclick="closePanel('resolvePanel')">Batal</button>
+        <button type="button" class="btn btn-primary" id="btnSubmitResolve" onclick="submitResolve()">Simpan Keputusan</button>
+    </div>
+</div>
+
 <div class="card" style="overflow:hidden;">
     <div style="overflow-x:auto;">
         <table class="data-table">
@@ -122,6 +162,8 @@ function statusBadge(t) {
         paid: '<span class="badge badge-success">Lunas</span>',
         expired: '<span class="badge badge-neutral">Kedaluwarsa</span>',
         failed: '<span class="badge badge-danger">Gagal</span>',
+        cancelled: '<span class="badge" style="background:#f1f5f9; color:#64748b; border-color:#cbd5e1;">Dibatalkan</span>',
+        needs_review: '<span class="badge" style="background:#f3e8ff; color:#7e22ce; border-color:#d8b4fe; font-weight:800;"><i class="fa-solid fa-triangle-exclamation"></i> Perlu Ditinjau</span>',
     };
     let html = map[t.status] || t.status;
     if (t.status === 'pending' && !t.last_synced_at) {
@@ -174,6 +216,7 @@ async function loadPage() {
 
         const actionBtns = (t) => `
             ${t.status === 'pending' ? `<button class="icon-action" title="Sinkronkan" onclick="syncSatu(${t.id_transaction})" id="syncBtn${t.id_transaction}"><i class="fa-solid fa-arrows-rotate"></i></button>` : ''}
+            ${t.status === 'needs_review' ? `<button class="icon-action" title="Selesaikan Peninjauan" style="background:#f3e8ff; color:#7e22ce;" onclick='bukaPanelResolve(${t.id_transaction}, ${JSON.stringify(t.nama_lengkap || "-")}, ${t.total_amount})'><i class="fa-solid fa-gavel"></i></button>` : ''}
             <button class="icon-action" title="Lihat Log" onclick="lihatLog(${t.id_transaction})"><i class="fa-solid fa-clock-rotate-left"></i></button>
         `;
 
@@ -319,6 +362,54 @@ function lihatLog(id) {
             `).join('');
         })
         .catch(() => { body.innerHTML = '<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Gagal memuat log.</p></div>'; });
+}
+
+// ===================== Selesaikan Peninjauan (needs_review) =====================
+let idTransactionResolveSaatIni = null;
+
+function bukaPanelResolve(id, nama, nominal) {
+    idTransactionResolveSaatIni = id;
+    document.getElementById('resolveNama').textContent = nama;
+    document.getElementById('resolveNominal').textContent = 'Rp ' + fmt(nominal);
+    document.getElementById('resolveCatatan').value = '';
+    document.getElementById('resolveError').style.display = 'none';
+    document.querySelector('input[name="resolveAksi"][value="terima"]').checked = true;
+    openPanel('resolvePanel');
+}
+
+function submitResolve() {
+    const aksi = document.querySelector('input[name="resolveAksi"]:checked').value;
+    const catatan = document.getElementById('resolveCatatan').value.trim();
+    const btn = document.getElementById('btnSubmitResolve');
+    const errBox = document.getElementById('resolveError');
+    errBox.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'Menyimpan…';
+
+    const formData = new FormData();
+    formData.append('aksi', aksi);
+    formData.append('catatan', catatan);
+
+    fetch(BASE_URL + '/admin/rekonsiliasi/resolve/' + idTransactionResolveSaatIni, { method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.textContent = 'Simpan Keputusan';
+            if (data.success) {
+                showToast(data.message || 'Keputusan berhasil disimpan.', 'success');
+                closePanel('resolvePanel');
+                loadPage();
+            } else {
+                errBox.textContent = data.message || 'Gagal menyimpan keputusan.';
+                errBox.style.display = 'block';
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.textContent = 'Simpan Keputusan';
+            errBox.textContent = 'Tidak dapat terhubung ke server.';
+            errBox.style.display = 'block';
+        });
 }
 
 loadPage();
